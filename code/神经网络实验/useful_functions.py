@@ -163,6 +163,34 @@ def get_B(A,u,n):
     v1=A.T@v
     return np.diag(v)@A@np.diag(1/v1)
 
+def test_row(A,epochs=100,if_plot=False):
+    # For Pull Sum and Pull Diag
+    n=A.shape[0]
+    c=np.ones(n)
+    W=np.eye(n)
+    list1,list2=[],[]
+    for i in range(epochs):
+        c=A.T@c
+        W=A@W
+        list1.append((1/(min(c))))
+        list2.append(1/min(np.diag(W)))
+    if if_plot:
+        plt.plot(list1,color='r',label='Sum, 1/min(correction_vector)')
+        plt.plot(list2,color='b',label='Diag, 1/min(Diag(W))')
+        plt.title('Comparison')
+        plt.xlabel('Epoch')
+        plt.ylabel('1/min')
+        plt.legend() 
+        plt.show()
+
+        plt.plot(list1,color='r',label='Sum, 1/min(correction_vector)')
+        plt.title('Sum, 1/min(correction_vector)')
+        plt.xlabel('Epoch')
+        plt.ylabel('1/min')
+        plt.legend() 
+        plt.show()
+    return max(list1),max(list2)
+
 def prettyshow(grads,legend,save='image.pdf',ylabel='Gradient Norm'):
     # plot the results
     plt.rcParams['figure.figsize'] = 5, 4
