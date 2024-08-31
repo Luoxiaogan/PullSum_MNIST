@@ -131,7 +131,7 @@ def get_mat1(n):
     col_sum = np.sum(W,axis=0)
     return W / col_sum
 
-def get_bad_mat(n=30,p=0.1,show_graph=0,seed=42,verbose=1):
+def get_bad_mat(n=10,p=0.15,show_graph=0,seed=42,verbose=1):
     # 生成稀疏随机矩阵，保证强连通
     M = np.zeros((n, n))
     cnt=0
