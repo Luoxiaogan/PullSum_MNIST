@@ -51,6 +51,24 @@ class MNISTClassifier_4layer(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.fc4(x)
         return x
+    
+class MNISTClassifier_4layer_improve(nn.Module):
+    def __init__(self):
+        super(MNISTClassifier_4layer_improve, self).__init__()
+        self.fc1 = nn.Linear(784, 256)
+        self.bn1 = nn.BatchNorm1d(256)  # 添加批归一化层
+        self.fc2 = nn.Linear(256, 128)
+        self.bn2 = nn.BatchNorm1d(128)  # 添加批归一化层
+        self.fc3 = nn.Linear(128, 64)
+        self.bn3 = nn.BatchNorm1d(64)   # 添加批归一化层
+        self.fc4 = nn.Linear(64, 10)
+
+    def forward(self, x):
+        x = F.leaky_relu(self.bn1(self.fc1(x)))  # 使用Leaky ReLU激活函数
+        x = F.leaky_relu(self.bn2(self.fc2(x)))  # 使用Leaky ReLU激活函数
+        x = F.leaky_relu(self.bn3(self.fc3(x)))  # 使用Leaky ReLU激活函数
+        x = self.fc4(x)
+        return x
 
 
 """ class SimpleNN(nn.Module):
