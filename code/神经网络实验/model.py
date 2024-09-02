@@ -37,9 +37,9 @@ class MNISTClassifier_3layer(nn.Module):
         x = self.fc3(x)                 # 第三层的输出用于分类，因此不使用激活函数
         return x
     
-class MNISTClassifier_4layer(nn.Module):
+class MNISTClassifier_4layer_1(nn.Module):
     def __init__(self):
-        super(MNISTClassifier_4layer, self).__init__()
+        super(MNISTClassifier_4layer_1, self).__init__()
         self.fc1 = nn.Linear(784, 256)
         self.fc2 = nn.Linear(256, 128)
         self.fc3 = nn.Linear(128, 64)
@@ -52,9 +52,9 @@ class MNISTClassifier_4layer(nn.Module):
         x = self.fc4(x)
         return x
     
-class MNISTClassifier_4layer_improve(nn.Module):
+class MNISTClassifier_4layer_2(nn.Module):
     def __init__(self):
-        super(MNISTClassifier_4layer_improve, self).__init__()
+        super(MNISTClassifier_4layer_2, self).__init__()
         self.fc1 = nn.Linear(784, 256)
         self.bn1 = nn.BatchNorm1d(256)  # 添加批归一化层
         self.fc2 = nn.Linear(256, 128)
@@ -67,6 +67,40 @@ class MNISTClassifier_4layer_improve(nn.Module):
         x = F.leaky_relu(self.bn1(self.fc1(x)))  # 使用Leaky ReLU激活函数
         x = F.leaky_relu(self.bn2(self.fc2(x)))  # 使用Leaky ReLU激活函数
         x = F.leaky_relu(self.bn3(self.fc3(x)))  # 使用Leaky ReLU激活函数
+        x = self.fc4(x)
+        return x
+    
+class MNISTClassifier_4layer_3(nn.Module):
+    def __init__(self):
+        super(MNISTClassifier_4layer_3, self).__init__()
+        self.fc1 = nn.Linear(784, 256)
+        self.bn1 = nn.BatchNorm1d(256)
+        self.fc2 = nn.Linear(256, 128)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.fc3 = nn.Linear(128, 64)
+        self.bn3 = nn.BatchNorm1d(64)
+        self.fc4 = nn.Linear(64, 10)
+        
+        # Dropout with a high rate to encourage overfitting
+        self.dropout = nn.Dropout(0.5)
+
+        # Initialize weights
+        self._initialize_weights()
+    
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
+    def forward(self, x):
+        x = F.relu(self.bn1(self.fc1(x)))
+        x = self.dropout(x)
+        x = F.relu(self.bn2(self.fc2(x)))
+        x = self.dropout(x)
+        x = F.relu(self.bn3(self.fc3(x)))
+        x = self.dropout(x)
         x = self.fc4(x)
         return x
 
