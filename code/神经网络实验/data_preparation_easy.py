@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 
 # 获取node=5的分类数据
 def prepare_node_5_easy():
+    "小数据，大异质性"
     X, y = mnist_data()
     
     # 将X和y明确转换为指定类型的NumPy数组
@@ -36,6 +37,7 @@ def prepare_node_5_easy():
 
 # 获取node=10的分类数据
 def prepare_node_10_easy():
+    "小数据，大异质性"
     X, y = mnist_data()
     
     # 将X和y明确转换为指定类型的NumPy数组
@@ -66,6 +68,7 @@ def prepare_node_10_easy():
 
 # 将数据打乱并分给5个节点
 def prepare_node_5_shuffled():
+    "小数据，均匀分布的数据，小异质性"
     X, y = mnist_data()
     
     # 将X和y转换为指定类型的NumPy数组
@@ -100,6 +103,7 @@ def prepare_node_5_shuffled():
 
 # 将数据打乱并分给10个节点
 def prepare_node_10_shuffled():
+    "小数据，均匀分布的数据，小异质性"
     X, y = mnist_data()
     
     # 将X和y转换为指定类型的NumPy数组

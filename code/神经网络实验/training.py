@@ -46,7 +46,8 @@ def train_PullSum(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None):
+        compute_accuracy=None
+        ):
     
     lr = n * lr
 
