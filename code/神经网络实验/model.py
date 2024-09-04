@@ -25,6 +25,7 @@ class MNISTClassifier_2layer_1(nn.Module):
         return x
     
 class MNISTClassifier_2layer_2(nn.Module):
+    """ 看来batchnorm对容忍大的学习率更有效 """
     def __init__(self,p=0.5):
         super(MNISTClassifier_2layer_2, self).__init__()
         self.fc1 = nn.Linear(784, 128)          # 第一层，全连接层
@@ -37,6 +38,21 @@ class MNISTClassifier_2layer_2(nn.Module):
         x = self.dropout(x)                     # Dropout 层，随机丢弃部分神经元
         x = self.fc2(x)                         # 第二层，全连接输出层（不使用激活函数）
         return x
+    
+class MNISTClassifier_2layer_3(nn.Module):
+    """ 没有batchnorm，但是有dropout——————>实际表现垃圾————>学习率一大就爆了 """
+    def __init__(self, p=0.5):
+        super(MNISTClassifier_2layer_3, self).__init__()
+        self.fc1 = nn.Linear(784, 128)          # 第一层，全连接层
+        self.fc2 = nn.Linear(128, 10)           # 第二层，全连接层
+        self.dropout = nn.Dropout(p=p)          # Dropout 层，防止过拟合
+    
+    def forward(self, x):
+        x = F.relu(self.fc1(x))                 # 第一层，先全连接，再 ReLU 激活
+        x = self.dropout(x)                     # Dropout 层，随机丢弃部分神经元
+        x = self.fc2(x)                         # 第二层，全连接输出层（不使用激活函数）
+        return x
+
     
 class MNISTClassifier_3layer(nn.Module):
     def __init__(self):
