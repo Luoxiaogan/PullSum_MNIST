@@ -112,7 +112,7 @@ def FRSD(A, init_x, h_data, y_data, grad_func, loss_func, grad_f_bar_func, d=784
     g0=np.linalg.norm(gradient_f_bar_x_val)
     gradient_history=[1]
     for i in range(max_it):
-        z=A@x
+        z=A@x 
         if i!=0:
             u=u+beta*(x-z)
         g = grad_func(x, y, h, rho=rho).reshape(x.shape)+sigma_n/mg*np.random.normal(size=(n,d))
