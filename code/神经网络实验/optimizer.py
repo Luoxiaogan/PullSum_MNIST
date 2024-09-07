@@ -231,16 +231,16 @@ class FRSD(Optimizer):
                 raise ValueError("v_list contains None")
             
         with torch.no_grad():
-            #step1: z=Ax
+            # step1: z = Ax
             for i, model in enumerate(self.model_list):
                 for param_idx, param in enumerate(model.parameters()):
                     # 初始化 z_list[i][param_idx] 为零张量
                     self.z_list[i][param_idx].zero_()
                     
-                    # 对所有模型的参数进行加权平均
+                    # 获取所有模型的对应参数
                     for j, other_model in enumerate(self.model_list):
-                        self.z_list[i][param_idx].add_(self.A[i, j] * other_model.parameters().__next__().clone())
-                        
+                        self.z_list[i][param_idx].add_(self.A[i, j] * list(other_model.parameters())[param_idx])
+                    
                     # 确保 z_list[i][param_idx] 的 device 与 param 一致
                     self.z_list[i][param_idx] = self.z_list[i][param_idx].to(param.device)
             #step2: u=u+beta*(x-z)
