@@ -46,7 +46,8 @@ def train_PullSum(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None
+        compute_accuracy=None,
+        show_graph=True
         ):
     
     lr = n * lr
@@ -93,22 +94,23 @@ def train_PullSum(
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
     
-    # 绘制损失和准确率历史图
-    plt.subplot(1, 2, 1)
-    plt.plot(loss_history, color='r')
-    plt.title('Loss History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    if show_graph:
+        # 绘制损失和准确率历史图
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history, color='r')
+        plt.title('Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(accuracy_history, color='b')
-    plt.title('Accuracy History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(accuracy_history, color='b')
+        plt.title('Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
 
-    plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
     return loss_history, accuracy_history
 
@@ -125,7 +127,8 @@ def train_PullDiag(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None):
+        compute_accuracy=None,
+        show_graph=True):
     
     # 检查CUDA是否可用，并在可能的情况下使用GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -168,22 +171,23 @@ def train_PullDiag(
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
     
-    # 绘制损失和准确率历史图
-    plt.subplot(1, 2, 1)
-    plt.plot(loss_history, color='r')
-    plt.title('Loss History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    if show_graph:
+        # 绘制损失和准确率历史图
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history, color='r')
+        plt.title('Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(accuracy_history, color='b')
-    plt.title('Accuracy History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(accuracy_history, color='b')
+        plt.title('Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
 
-    plt.suptitle(f'PullDiag, n={n}, lr={lr:.6f}')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+        plt.suptitle(f'PullDiag, n={n}, lr={lr:.6f}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
     return loss_history, accuracy_history
 
@@ -201,7 +205,8 @@ def train_FRSD(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None):
+        compute_accuracy=None,
+        show_graph=True):
     
     # 检查CUDA是否可用，并在可能的情况下使用GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -244,22 +249,23 @@ def train_FRSD(
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
     
-    # 绘制损失和准确率历史图
-    plt.subplot(1, 2, 1)
-    plt.plot(loss_history, color='r')
-    plt.title('Loss History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    if show_graph:
+        # 绘制损失和准确率历史图
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history, color='r')
+        plt.title('Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(accuracy_history, color='b')
-    plt.title('Accuracy History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(accuracy_history, color='b')
+        plt.title('Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
 
-    plt.suptitle(f'FRSD, n={n}, lr={lr:.6f}')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+        plt.suptitle(f'FRSD, n={n}, lr={lr:.6f}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
     return loss_history, accuracy_history
 
@@ -277,7 +283,8 @@ def train_FROZEN(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None):
+        compute_accuracy=None,
+        show_graph=True):
     
     # 检查CUDA是否可用，并在可能的情况下使用GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -320,22 +327,23 @@ def train_FROZEN(
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
     
-    # 绘制损失和准确率历史图
-    plt.subplot(1, 2, 1)
-    plt.plot(loss_history, color='r')
-    plt.title('Loss History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    if show_graph:
+        # 绘制损失和准确率历史图
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history, color='r')
+        plt.title('Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(accuracy_history, color='b')
-    plt.title('Accuracy History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(accuracy_history, color='b')
+        plt.title('Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
 
-    plt.suptitle(f'FROZEN, n={n}, lr={lr:.6f}')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+        plt.suptitle(f'FROZEN, n={n}, lr={lr:.6f}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
     return loss_history, accuracy_history
 
@@ -351,7 +359,8 @@ def train_Diag_SDG(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None):
+        compute_accuracy=None,
+        show_graph=True):
     
     # 检查CUDA是否可用，并在可能的情况下使用GPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -394,21 +403,22 @@ def train_Diag_SDG(
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
     
-    # 绘制损失和准确率历史图
-    plt.subplot(1, 2, 1)
-    plt.plot(loss_history, color='r')
-    plt.title('Loss History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Loss')
+    if show_graph:
+        # 绘制损失和准确率历史图
+        plt.subplot(1, 2, 1)
+        plt.plot(loss_history, color='r')
+        plt.title('Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
 
-    plt.subplot(1, 2, 2)
-    plt.plot(accuracy_history, color='b')
-    plt.title('Accuracy History')
-    plt.xlabel('Epoch')
-    plt.ylabel('Accuracy')
+        plt.subplot(1, 2, 2)
+        plt.plot(accuracy_history, color='b')
+        plt.title('Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
 
-    plt.suptitle(f'Diag_SGD, n={n}, lr={lr:.6f}')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.show()
+        plt.suptitle(f'Diag_SGD, n={n}, lr={lr:.6f}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
     return loss_history, accuracy_history
