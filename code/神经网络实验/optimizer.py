@@ -408,7 +408,7 @@ class Diag_SGD(Optimizer):
         defaults = dict(lr=lr)
         super(Diag_SGD, self).__init__(model_list[0].parameters(), defaults)
 
-    def step(self,closure):
+    def step(self, closure):
         for model in self.model_list:
             model.zero_grad()
             loss = closure()
@@ -420,15 +420,16 @@ class Diag_SGD(Optimizer):
                     if param.grad is not None:
                         self.v_list[i][j] = (1.0 / self.W[i, i]) * param.grad
 
-                # Calculate weighted average of parameters from all models
-                avg_params = torch.zeros_like(next(model.parameters()))
-                for k, other_model in enumerate(self.model_list):
-                    avg_params += self.A[i, k] * next(other_model.parameters())
-
                 # Update each parameter
-                for param, v in zip(model.parameters(), self.v_list[i]):
-                    if v is not None:
-                        param.data = avg_params - self.lr * v
-            #更新W
-            self.W=self.W@self.A
+                for j, param in enumerate(model.parameters()):
+                    avg_params = torch.zeros_like(param)
+                    for k, other_model in enumerate(self.model_list):
+                        avg_params += self.A[i, k] * list(other_model.parameters())[j]
+                    
+                    if self.v_list[i][j] is not None:
+                        param.data = avg_params - self.lr * self.v_list[i][j]
+
+            # 更新W
+            self.W = self.W @ self.A
+
         return loss

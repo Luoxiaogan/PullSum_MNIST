@@ -237,12 +237,17 @@ def train_FRSD(
     loss_history = []
     accuracy_history = []
 
-    # 创建 tqdm 对象以显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
 
     for epoch in progress_bar:
         loss = optimizer.step(closure)  # 调用优化器的 step 方法，并传入 closure
         loss_history.append(loss)
+
+        # 检查是否有 inf 或 nan
+        if np.isnan(loss) or np.isinf(loss):
+            print(f"Stopping early due to inf/nan in loss at epoch {epoch + 1}")
+            break  # 跳出循环
+
         accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
         accuracy_history.append(accuracy)
 
@@ -315,18 +320,23 @@ def train_FROZEN(
     loss_history = []
     accuracy_history = []
 
-    # 创建 tqdm 对象以显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
 
     for epoch in progress_bar:
         loss = optimizer.step(closure)  # 调用优化器的 step 方法，并传入 closure
         loss_history.append(loss)
+
+        # 检查是否有 inf 或 nan
+        if np.isnan(loss) or np.isinf(loss):
+            print(f"Stopping early due to inf/nan in loss at epoch {epoch + 1}")
+            break  # 跳出循环
+
         accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
         accuracy_history.append(accuracy)
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
-    
+        
     if show_graph:
         # 绘制损失和准确率历史图
         plt.subplot(1, 2, 1)
@@ -391,18 +401,23 @@ def train_Diag_SDG(
     loss_history = []
     accuracy_history = []
 
-    # 创建 tqdm 对象以显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
 
     for epoch in progress_bar:
         loss = optimizer.step(closure)  # 调用优化器的 step 方法，并传入 closure
         loss_history.append(loss)
+
+        # 检查是否有 inf 或 nan
+        if np.isnan(loss) or np.isinf(loss):
+            print(f"Stopping early due to inf/nan in loss at epoch {epoch + 1}")
+            break  # 跳出循环
+
         accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
         accuracy_history.append(accuracy)
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
-    
+
     if show_graph:
         # 绘制损失和准确率历史图
         plt.subplot(1, 2, 1)
