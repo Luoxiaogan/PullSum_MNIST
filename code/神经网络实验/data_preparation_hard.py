@@ -3,6 +3,45 @@ from torchvision import datasets, transforms
 from sklearn.model_selection import train_test_split
 import numpy as np
 
+def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha):
+    """
+    使用狄利克雷分布将两个数据集进行混合。
+    
+    参数:
+    - h_data1, y_data1: 第一个数据集（均匀分布）
+    - h_data2, y_data2: 第二个数据集（完全异质性分布）
+    - alpha: 狄利克雷分布的参数
+
+    返回:
+    - h_data_mixed, y_data_mixed: 混合后的数据集
+    """
+    num_nodes = len(h_data1)
+    h_data_mixed = []
+    y_data_mixed = []
+    
+    for i in range(num_nodes):
+        # 生成狄利克雷分布的权重
+        dirichlet_weights = np.random.dirichlet([alpha, alpha])
+
+        # 混合数据集
+        h_data_mixed_i = np.concatenate([
+            h_data1[i][:int(dirichlet_weights[0] * len(h_data1[i]))],
+            h_data2[i][:int(dirichlet_weights[1] * len(h_data2[i]))]
+        ])
+        
+        y_data_mixed_i = np.concatenate([
+            y_data1[i][:int(dirichlet_weights[0] * len(y_data1[i]))],
+            y_data2[i][:int(dirichlet_weights[1] * len(y_data2[i]))]
+        ])
+        
+        # Shuffle the mixed data
+        perm = np.random.permutation(len(h_data_mixed_i))
+        h_data_mixed.append(h_data_mixed_i[perm])
+        y_data_mixed.append(y_data_mixed_i[perm])
+    
+    return h_data_mixed, y_data_mixed
+
+
 # Define a transform to normalize the data
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -123,3 +162,21 @@ def prepare_node_10_hard_shuffled():
         y_train_list[-1] = torch.cat((y_train_list[-1], y_train[10 * chunk_size:]), dim=0)
     
     return X_train_list, y_train_list, X_test, y_test
+
+def prepare_node_5_hard_mix(alpha=1):
+    """ alpha ——> 0, 高异质性; alpha ——> infty, 均匀分布 """
+    h_data1, y_data1, X_test1, y_test1 = prepare_node_5_hard()#大异质性
+    h_data2, y_data2, X_test2, y_test2 = prepare_node_5_hard_shuffled()#均匀
+    h_data_mixed, y_data_mixed = mix_datasets_with_dirichlet(h_data1=h_data1, y_data1=y_data1, h_data2=h_data2, y_data2=y_data2, alpha=alpha)
+    X_test_mixed = torch.cat((X_test1, X_test2), dim=0)
+    y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
+    return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
+
+def prepare_node_10_hard_mix(alpha=1):
+    """ alpha ——> 0, 高异质性; alpha ——> infty, 均匀分布 """
+    h_data1, y_data1, X_test1, y_test1 = prepare_node_10_hard()#大异质性
+    h_data2, y_data2, X_test2, y_test2 = prepare_node_10_hard_shuffled()#均匀
+    h_data_mixed, y_data_mixed = mix_datasets_with_dirichlet(h_data1=h_data1, y_data1=y_data1, h_data2=h_data2, y_data2=y_data2, alpha=alpha)
+    X_test_mixed = torch.cat((X_test1, X_test2), dim=0)
+    y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
+    return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
