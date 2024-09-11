@@ -1,5 +1,6 @@
 # 忽略所有 .ipynb_checkpoints 目录中的内容
-#.ipynb_checkpoints/
+.ipynb_checkpoints/
+.ipyc
 
 # 忽略特定的文件
 MNIST_digits_2_4.mat
