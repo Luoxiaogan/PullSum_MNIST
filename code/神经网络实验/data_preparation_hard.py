@@ -5,6 +5,7 @@ import numpy as np
 
 import numpy as np
 import torch
+import random
 
 def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=49):
     """
@@ -185,6 +186,54 @@ def prepare_node_5_hard_mix(alpha=1,seed=42):
     y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
     return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
 
+def prepare_node_5_hard_linear_mix(p1=0.5, seed=42):
+    """ 
+    p1 是高异质性数据抽样的比例，p2=1-p1 是均匀分布数据抽样的比例
+    """
+    # 获取原始数据
+    h_data1, y_data1, X_test1, y_test1 = prepare_node_5_hard()  # 大异质性，对应 p1
+    h_data2, y_data2, X_test2, y_test2 = prepare_node_5_hard_shuffled()  # 均匀，对应 p2
+    
+    p2 = 1 - p1
+    
+    # 设置随机种子
+    np.random.seed(seed)
+
+    h_data_mixed = []
+    y_data_mixed = []
+
+    # 依次对每个节点进行抽样
+    for h1, y1, h2, y2 in zip(h_data1, y_data1, h_data2, y_data2):
+        # 确定每个数据集的抽样数量
+        len_h1 = len(h1)
+        len_h2 = len(h2)
+        
+        # 计算抽样数量（不能整除时向下取整）
+        sample_size_h1 = int(len_h1 * p1)
+        sample_size_h2 = int(len_h2 * p2)
+        
+        # 从 h1, y1 和 h2, y2 中分别抽样
+        indices_h1 = np.random.choice(len_h1, sample_size_h1, replace=False)
+        indices_h2 = np.random.choice(len_h2, sample_size_h2, replace=False)
+        
+        h1_sampled = h1[indices_h1]
+        y1_sampled = y1[indices_h1]
+        h2_sampled = h2[indices_h2]
+        y2_sampled = y2[indices_h2]
+
+        # 将两个抽样结果拼接
+        h_mixed = torch.cat([h1_sampled, h2_sampled], dim=0)
+        y_mixed = torch.cat([y1_sampled, y2_sampled], dim=0)
+
+        h_data_mixed.append(h_mixed)
+        y_data_mixed.append(y_mixed)
+    
+    # 测试数据直接拼接
+    X_test = torch.cat((X_test1, X_test2), dim=0)
+    y_test = torch.cat((y_test1, y_test2), dim=0)
+    
+    return h_data_mixed, y_data_mixed, X_test, y_test
+
 def prepare_node_10_hard_mix(alpha=1,seed=42):
     """ alpha ——> 0, 高异质性; alpha ——> infty, 均匀分布 """
     h_data1, y_data1, X_test1, y_test1 = prepare_node_10_hard()#大异质性
@@ -193,3 +242,51 @@ def prepare_node_10_hard_mix(alpha=1,seed=42):
     X_test_mixed = torch.cat((X_test1, X_test2), dim=0)
     y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
     return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
+
+def prepare_node_10_hard_linear_mix(p1=0.5, seed=42):
+    """ 
+    p1 是高异质性数据抽样的比例，p2=1-p1 是均匀分布数据抽样的比例
+    """
+    # 获取原始数据
+    h_data1, y_data1, X_test1, y_test1 = prepare_node_10_hard()  # 大异质性，对应 p1
+    h_data2, y_data2, X_test2, y_test2 = prepare_node_10_hard_shuffled()  # 均匀，对应 p2
+    
+    p2 = 1 - p1
+    
+    # 设置随机种子
+    np.random.seed(seed)
+
+    h_data_mixed = []
+    y_data_mixed = []
+
+    # 依次对每个节点进行抽样
+    for h1, y1, h2, y2 in zip(h_data1, y_data1, h_data2, y_data2):
+        # 确定每个数据集的抽样数量
+        len_h1 = len(h1)
+        len_h2 = len(h2)
+        
+        # 计算抽样数量（不能整除时向下取整）
+        sample_size_h1 = int(len_h1 * p1)
+        sample_size_h2 = int(len_h2 * p2)
+        
+        # 从 h1, y1 和 h2, y2 中分别抽样
+        indices_h1 = np.random.choice(len_h1, sample_size_h1, replace=False)
+        indices_h2 = np.random.choice(len_h2, sample_size_h2, replace=False)
+        
+        h1_sampled = h1[indices_h1]
+        y1_sampled = y1[indices_h1]
+        h2_sampled = h2[indices_h2]
+        y2_sampled = y2[indices_h2]
+
+        # 将两个抽样结果拼接
+        h_mixed = torch.cat([h1_sampled, h2_sampled], dim=0)
+        y_mixed = torch.cat([y1_sampled, y2_sampled], dim=0)
+
+        h_data_mixed.append(h_mixed)
+        y_data_mixed.append(y_mixed)
+    
+    # 测试数据直接拼接
+    X_test = torch.cat((X_test1, X_test2), dim=0)
+    y_test = torch.cat((y_test1, y_test2), dim=0)
+    
+    return h_data_mixed, y_data_mixed, X_test, y_test
