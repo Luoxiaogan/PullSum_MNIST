@@ -268,7 +268,7 @@ def train_FRSD(
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
 
-        plt.suptitle(f'FRSD, n={n}, lr={lr:.6f}')
+        plt.suptitle(f'FRSD, n={n}, lr={lr:.6f}, beta={beta:.6f}')
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
 
@@ -351,7 +351,7 @@ def train_FROZEN(
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
 
-        plt.suptitle(f'FROZEN, n={n}, lr={lr:.6f}')
+        plt.suptitle(f'FROZEN, n={n}, lr={lr:.6f}, beta={beta:.6f}')
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
 
