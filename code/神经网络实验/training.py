@@ -147,7 +147,7 @@ def new_train_PullSum(
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
 
-        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}')
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.show()
 
