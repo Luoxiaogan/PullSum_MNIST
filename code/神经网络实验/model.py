@@ -38,6 +38,24 @@ class MNISTClassifier_2layer_2(nn.Module):
         x = self.dropout(x)                     # Dropout 层，随机丢弃部分神经元
         x = self.fc2(x)                         # 第二层，全连接输出层（不使用激活函数）
         return x
+
+class MNISTClassifier_2layer_2_improve(nn.Module):
+    """ 改进后的 MNIST 分类模型，防止梯度和 loss 爆炸 """
+    def __init__(self, p=0.5):
+        super(MNISTClassifier_2layer_2_improve, self).__init__()
+        self.fc1 = nn.Linear(784, 128)           # 第一层，全连接层
+        self.bn1 = nn.BatchNorm1d(128)           # 第一层，批归一化
+        self.fc2 = nn.Linear(128, 10)            # 第二层，全连接层
+        self.dropout = nn.Dropout(p=p)           # Dropout 层，防止过拟合
+        self.leaky_relu = nn.LeakyReLU(0.01)     # 使用 LeakyReLU 替换 ReLU
+    
+    def forward(self, x):
+        x = self.fc1(x)                          # 第一层，全连接
+        x = self.bn1(x)                          # 批归一化
+        x = self.leaky_relu(x)                   # LeakyReLU 激活
+        x = self.dropout(x)                      # Dropout 层
+        x = self.fc2(x)                          # 第二层，全连接输出层
+        return x
     
 class MNISTClassifier_2layer_3(nn.Module):
     """ 没有batchnorm，但是有dropout——————>实际表现垃圾————>学习率一大就爆了 """
