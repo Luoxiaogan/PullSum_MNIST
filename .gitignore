@@ -2,7 +2,7 @@
 .ipynb_checkpoints/
 .pyc
 .data/
-.data_cifar10
+.data_cifar10/
 
 # 忽略特定的文件
 MNIST_digits_2_4.mat
