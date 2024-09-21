@@ -72,22 +72,47 @@ def new_train_PullSum(
     model_list = [model_class().to(device) for _ in range(n)]  # 确保模型在GPU上
     criterion = criterion_class().to(device)  # 确保损失函数在GPU上
 
+    h_data_train = h_data.copy()
+    y_data_train = y_data.copy()
+
+    X_data_for_accuracy_compute = torch.cat(h_data, dim=0)  # 在第0维上连接
+    y_data_for_accuracy_compute = torch.cat(y_data, dim=0)  # 在第0维上连接
+
+
     def closure():
         total_loss = 0
         for i, model in enumerate(model_list):
             for param in model.parameters():
                 param.requires_grad = True
             model.zero_grad()
-            output = model(h_data[i])
-            loss = criterion(output, y_data[i])
+            output = model(h_data_train[i])
+            loss = criterion(output, y_data_train[i])
             loss.backward()
             total_loss += loss.item()
         return total_loss / len(model_list)
     
     optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
+    #后面的batch中不需要更改optimizer, 只需要更改h_data_train和y_data_train的定义就行了
 
-    loss_history = []
-    accuracy_history = []
+    train_loss_history = []
+    train_accuracy_history = []
+    test_accuracy_history = []
+
+    #准备如果使用batch的话，的loader
+    h_data_batches = []
+    y_data_batches = []
+    train_loaders = [torch.utils.data.DataLoader(torch.utils.data.TensorDataset(h_data[i], y_data[i]),batch_size=batch_size,shuffle=True) for i in range(n)]
+    train_loader_iters = [iter(loader) for loader in train_loaders]
+    for _ in range(len(train_loaders[0])):  # 所有模型的数据集长度相同
+        h_data_batch = []
+        y_data_batch = []
+        for i in range(n):
+            batch_h_data, batch_y_data = next(train_loader_iters[i])  # 获取该模型当前 batch
+            h_data_batch.append(batch_h_data)
+            y_data_batch.append(batch_y_data)
+
+        h_data_batches.append(h_data_batch)
+        y_data_batches.append(y_data_batch)
 
     # 创建 tqdm 对象显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
@@ -99,59 +124,60 @@ def new_train_PullSum(
             # 无批处理：直接使用整个数据进行训练
             loss = optimizer.step(closure)
             epoch_loss = loss
-        else:
-            # 使用 DataLoader 进行批处理
-            for i, model in enumerate(model_list):
-                model.train()
-                train_loader = torch.utils.data.DataLoader(
-                    torch.utils.data.TensorDataset(h_data[i], y_data[i]),
-                    batch_size=batch_size,
-                    shuffle=True
-                )
-                
-                # 使用 tqdm 显示 batch 的进度
-                batch_progress_bar = tqdm(train_loader, desc=f"Epoch {epoch+1} - Model {i+1}", leave=False)
-                
-                for batch_h_data, batch_y_data in batch_progress_bar:
-                    def batch_closure():
-                        model.zero_grad()
-                        output = model(batch_h_data)
-                        loss = criterion(output, batch_y_data)
-                        loss.backward()
-                        return loss
-                    
-                    # 执行优化步骤
-                    loss = optimizer.step(batch_closure)
-                    epoch_loss += loss.item()
-                    batch_progress_bar.set_postfix(loss=f"{loss.item():.4f}")
-            epoch_loss = epoch_loss / len(train_loader)#标准化
-                    
-        loss_history.append(epoch_loss / len(model_list))
-        accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
-        accuracy_history.append(accuracy)
+        else:# 批处理
+            for batch_h_data, batch_y_data in zip(h_data_batches, y_data_batches):
+                h_data_train = batch_h_data
+                y_data_train = batch_y_data
+                loss = optimizer.step(closure)
+                epoch_loss += loss
+            epoch_loss = epoch_loss/len(train_loaders[0])#标准化
+        train_loss_history.append(epoch_loss / len(model_list))#另一个标准化
+        test_accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
+        test_accuracy_history.append(test_accuracy)
+        train_accuracy = compute_accuracy(model_list, X_data_for_accuracy_compute, y_data_for_accuracy_compute)  # 计算训练集上的准确率
+        train_accuracy_history.append(train_accuracy)
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
-        progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss_history[-1]:.10f}", accuracy=f"{100 * accuracy:.10f}%")
+        progress_bar.set_postfix(epoch=epoch + 1, loss=f"{train_loss_history[-1]:.10f}",trian_accuracy=f"{100 * train_accuracy:.10f}%", test_accuracy=f"{100 * test_accuracy:.10f}%")
     
     if show_graph:
-        # 绘制损失和准确率历史图
+        # 创建一个2行2列的子图布局
         plt.subplot(1, 2, 1)
-        plt.plot(loss_history, color='r')
-        plt.title('Loss History')
+        plt.plot(train_loss_history, color='r')
+        plt.title('Train Loss History')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
 
         plt.subplot(1, 2, 2)
-        plt.plot(accuracy_history, color='b')
-        plt.title('Accuracy History')
+        plt.plot(train_accuracy_history, color='b')
+        plt.title('Train Accuracy History')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy')
 
         plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
-        plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.tight_layout(rect=[0, 0.03, 1, 0.90])  # 调整顶部边距
         plt.show()
 
-    return loss_history, accuracy_history
+        plt.subplot(1, 2, 1)
+        plt.plot(test_accuracy_history, color='b')
+        plt.title('Test Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(train_accuracy_history, color='blue', label='Train')
+        plt.plot(test_accuracy_history, color='red', label='Test')
+        plt.title('Comparison')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.90])  # 调整顶部边距
+        plt.show()
+
+
+    return train_loss_history, test_accuracy_history
 
 
 

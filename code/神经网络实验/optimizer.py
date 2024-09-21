@@ -32,8 +32,22 @@ class PullSum(Optimizer):
         
         self.correction_vector = torch.ones(A.shape[0], device=model_list[0].parameters().__next__().device)  # 确保在相同设备上
 
+        for model_gradients in self.v_list:
+            if any(v is None for v in model_gradients):
+                raise ValueError("v_list contains None")
+        for prev_model_gradients in self.prev_v_list:
+            if any(v is None for v in prev_model_gradients):
+                raise ValueError("prev_v_list contains None")
+
         defaults = dict(lr=lr)
         super(PullSum, self).__init__(model_list[0].parameters(), defaults)
+        
+        for model_gradients in self.v_list:
+            if any(v is None for v in model_gradients):
+                raise ValueError("v_list contains None")
+        for prev_model_gradients in self.prev_v_list:
+            if any(v is None for v in prev_model_gradients):
+                raise ValueError("prev_v_list contains None")
     
     def step(self, closure):
         for model_gradients in self.v_list:
