@@ -53,17 +53,6 @@ def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=
     
     return h_data_mixed, y_data_mixed
 
-def load_cifar10_batch(batch_path):
-    """ 加载单个批次的数据 """
-    with open(batch_path, 'rb') as f:
-        batch = pickle.load(f, encoding='bytes')
-        # 读取数据和标签
-        X = batch[b'data']
-        y = batch[b'labels']
-        # CIFAR-10 中每个图像为 3 x 32 x 32 的彩色图像，需要重新reshape
-        X = X.reshape(-1, 3, 32, 32).astype('float32')
-        return X, np.array(y)
-
 """ def load_cifar10_data():
     # 设置路径
     cifar10_dir = '/home/bluefog/GanLuo/PullSum_MNIST/code/神经网络实验/data_cifar10'
@@ -92,6 +81,17 @@ def load_cifar10_batch(batch_path):
     X_test = (X_test / 255.0 - mean) / std
     
     return X_train, X_test, y_train, y_test """
+
+def load_cifar10_batch(batch_path):
+    """ 加载单个批次的数据 """
+    with open(batch_path, 'rb') as f:
+        batch = pickle.load(f, encoding='bytes')
+        # 读取数据和标签
+        X = batch[b'data']
+        y = batch[b'labels']
+        # CIFAR-10 中每个图像为 3 x 32 x 32 的彩色图像，需要重新reshape
+        X = X.reshape(-1, 3, 32, 32).astype('float32')
+        return X, np.array(y)
 
 def load_cifar10_data():
     # 设置路径
