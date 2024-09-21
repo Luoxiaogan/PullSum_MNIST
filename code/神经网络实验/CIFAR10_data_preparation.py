@@ -4,6 +4,7 @@ import torchvision.transforms as transforms
 import numpy as np
 import pickle
 import os
+import tarfile
 
 def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=49):
     """
@@ -94,14 +95,7 @@ def load_cifar10_batch(batch_path):
 
 def load_cifar10_data():
     # 设置路径
-    cifar10_dir = '/autodl-pub/data/cifar-10'
-
-    # 解压数据文件（如果尚未解压）
-    for file_name in ['cifar-10-binary.tar.gz', 'cifar-10-python.tar.gz']:
-        file_path = os.path.join(cifar10_dir, file_name)
-        if os.path.exists(file_path):
-            with tarfile.open(file_path, 'r:gz') as tar:
-                tar.extractall(path=cifar10_dir)
+    cifar10_dir = '/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10data/cifar-10-batches-py'
 
     # 加载所有训练批次
     X_train = []
@@ -117,7 +111,8 @@ def load_cifar10_data():
     y_train = np.concatenate(y_train, axis=0)
 
     # 加载测试集
-    X_test, y_test = load_cifar10_batch(os.path.join(cifar10_dir, 'test_batch'))
+    test_batch_path = os.path.join(cifar10_dir, 'test_batch')
+    X_test, y_test = load_cifar10_batch(test_batch_path)
 
     # 正则化数据，与 `torchvision` 中的标准化保持一致
     mean = np.array([0.4914, 0.4822, 0.4465]).reshape(1, 3, 1, 1)
@@ -127,7 +122,6 @@ def load_cifar10_data():
     X_test = (X_test / 255.0 - mean) / std
 
     return X_train, X_test, y_train, y_test
-
 
 # 获取node=5的分类数据
 def cifar10_prepare_node_5_hard():
