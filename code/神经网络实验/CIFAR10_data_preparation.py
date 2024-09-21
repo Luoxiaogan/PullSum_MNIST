@@ -5,6 +5,7 @@ import numpy as np
 import pickle
 import os
 import tarfile
+import imgaug.augmenters as iaa
 
 def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=49):
     """
@@ -92,8 +93,28 @@ def load_cifar10_batch(batch_path):
         # CIFAR-10 中每个图像为 3 x 32 x 32 的彩色图像，需要重新reshape
         X = X.reshape(-1, 3, 32, 32).astype('float32')
         return X, np.array(y)
+    
+def augment_data(X):
+    """ 使用 imgaug 进行数据增强 """
+    # 定义数据增强的流水线
+    seq = iaa.Sequential([
+        iaa.Fliplr(0.5),  # 水平翻转 50% 的图像
+        iaa.Crop(percent=(0, 0.1)),  # 随机裁剪图像边缘
+        iaa.Affine(rotate=(-10, 10)),  # 随机旋转 -10 到 10 度
+        iaa.Multiply((0.8, 1.2)),  # 随机调整亮度
+        iaa.LinearContrast((0.75, 1.5))  # 随机调整对比度
+    ])
 
-def load_cifar10_data():
+    # 转换数据维度为 (batch_size, 32, 32, 3) 以适应 imgaug
+    X = np.transpose(X, (0, 2, 3, 1))
+    X_augmented = seq(images=X)
+    # 转换回 (batch_size, 3, 32, 32)
+    X_augmented = np.transpose(X_augmented, (0, 3, 1, 2))
+
+    return X_augmented
+
+def load_cifar10_data(augment=False):
+    """ 加载 CIFAR-10 数据，augment 参数决定是否进行数据增强 """
     # 设置路径
     cifar10_dir = '/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10data/cifar-10-batches-py'
 
@@ -110,6 +131,10 @@ def load_cifar10_data():
     X_train = np.concatenate(X_train, axis=0)
     y_train = np.concatenate(y_train, axis=0)
 
+    # 如果 augment=True，则对训练集进行数据增强
+    if augment:
+        X_train = augment_data(X_train)
+
     # 加载测试集
     test_batch_path = os.path.join(cifar10_dir, 'test_batch')
     X_test, y_test = load_cifar10_batch(test_batch_path)
@@ -124,8 +149,8 @@ def load_cifar10_data():
     return X_train, X_test, y_train, y_test
 
 # 获取node=5的分类数据
-def cifar10_prepare_node_5_hard():
-    X_train, X_test, y_train, y_test = load_cifar10_data()
+def cifar10_prepare_node_5_hard(augment=False):
+    X_train, X_test, y_train, y_test = load_cifar10_data(augment=augment)
 
     # 转换回PyTorch张量
     X_train = torch.tensor(X_train, dtype=torch.float32)
@@ -148,8 +173,8 @@ def cifar10_prepare_node_5_hard():
     return h_data, y_data, X_test, y_test
 
 # 获取node=10的分类数据
-def cifar10_prepare_node_10_hard():
-    X_train, X_test, y_train, y_test = load_cifar10_data()
+def cifar10_prepare_node_10_hard(augment=False):
+    X_train, X_test, y_train, y_test = load_cifar10_data(augment=augment)
 
     # 转换回PyTorch张量
     X_train = torch.tensor(X_train, dtype=torch.float32)
@@ -170,8 +195,8 @@ def cifar10_prepare_node_10_hard():
     
     return X_train_list, y_train_list, X_test, y_test
 
-def cifar10_prepare_node_5_hard_shuffled():
-    X_train, X_test, y_train, y_test = load_cifar10_data()
+def cifar10_prepare_node_5_hard_shuffled(augment=False):
+    X_train, X_test, y_train, y_test = load_cifar10_data(augment=augment)
 
     # 转换回PyTorch张量
     X_train = torch.tensor(X_train, dtype=torch.float32)
@@ -197,8 +222,8 @@ def cifar10_prepare_node_5_hard_shuffled():
     return h_data, y_data, X_test, y_test
 
 # 获取node=10的分类数据
-def cifar10_prepare_node_10_hard_shuffled():
-    X_train, X_test, y_train, y_test = load_cifar10_data()
+def cifar10_prepare_node_10_hard_shuffled(augment=False):
+    X_train, X_test, y_train, y_test = load_cifar10_data(augment=augment)
 
     # 转换回PyTorch张量
     X_train = torch.tensor(X_train, dtype=torch.float32)
@@ -226,22 +251,22 @@ def cifar10_prepare_node_10_hard_shuffled():
     
     return X_train_list, y_train_list, X_test, y_test
 
-def cifar10_prepare_node_5_hard_mix(alpha=1,seed=42):
+def cifar10_prepare_node_5_hard_mix(alpha=1,seed=42,augment=False):
     """ alpha ——> 0, 高异质性; alpha ——> infty, 均匀分布 """
-    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_5_hard()#大异质性
-    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_5_hard_shuffled()#均匀
+    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_5_hard(augment=augment)#大异质性
+    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_5_hard_shuffled(augment=augment)#均匀
     h_data_mixed, y_data_mixed = mix_datasets_with_dirichlet(h_data1=h_data1, y_data1=y_data1, h_data2=h_data2, y_data2=y_data2, alpha=alpha,seed=seed)
     X_test_mixed = torch.cat((X_test1, X_test2), dim=0)
     y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
     return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
 
-def cifar10_prepare_node_5_hard_linear_mix(p1=0.5, seed=42):
+def cifar10_prepare_node_5_hard_linear_mix(p1=0.5, seed=42,augment=False):
     """ 
     p1 是高异质性数据抽样的比例，p2=1-p1 是均匀分布数据抽样的比例
     """
     # 获取原始数据
-    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_5_hard()  # 大异质性，对应 p1
-    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_5_hard_shuffled()  # 均匀，对应 p2
+    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_5_hard(augment=augment)  # 大异质性，对应 p1
+    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_5_hard_shuffled(augment=augment)  # 均匀，对应 p2
     
     p2 = 1 - p1
     
@@ -283,22 +308,22 @@ def cifar10_prepare_node_5_hard_linear_mix(p1=0.5, seed=42):
     
     return h_data_mixed, y_data_mixed, X_test, y_test
 
-def cifar10_prepare_node_10_hard_mix(alpha=1,seed=42):
+def cifar10_prepare_node_10_hard_mix(alpha=1,seed=42,augment=False):
     """ alpha ——> 0, 高异质性; alpha ——> infty, 均匀分布 """
-    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_10_hard()#大异质性
-    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_10_hard_shuffled()#均匀
+    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_10_hard(augment=augment)#大异质性
+    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_10_hard_shuffled(augment=augment)#均匀
     h_data_mixed, y_data_mixed = mix_datasets_with_dirichlet(h_data1=h_data1, y_data1=y_data1, h_data2=h_data2, y_data2=y_data2, alpha=alpha,seed=seed)
     X_test_mixed = torch.cat((X_test1, X_test2), dim=0)
     y_test_mixed = torch.cat((y_test1, y_test2), dim=0)
     return h_data_mixed,y_data_mixed,X_test_mixed,y_test_mixed
 
-def cifar10_prepare_node_10_hard_linear_mix(p1=0.5, seed=42):
+def cifar10_prepare_node_10_hard_linear_mix(p1=0.5, seed=42, augment=False):
     """ 
     p1 是高异质性数据抽样的比例，p2=1-p1 是均匀分布数据抽样的比例
     """
     # 获取原始数据
-    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_10_hard()  # 大异质性，对应 p1
-    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_10_hard_shuffled()  # 均匀，对应 p2
+    h_data1, y_data1, X_test1, y_test1 = cifar10_prepare_node_10_hard(augment=augment)  # 大异质性，对应 p1
+    h_data2, y_data2, X_test2, y_test2 = cifar10_prepare_node_10_hard_shuffled(augment=augment)  # 均匀，对应 p2
     
     p2 = 1 - p1
     
