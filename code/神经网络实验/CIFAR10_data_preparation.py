@@ -63,7 +63,7 @@ def load_cifar10_batch(batch_path):
         X = X.reshape(-1, 3, 32, 32).astype('float32')
         return X, np.array(y)
 
-def load_cifar10_data():
+""" def load_cifar10_data():
     # 设置路径
     cifar10_dir = '/home/bluefog/GanLuo/PullSum_MNIST/code/神经网络实验/data_cifar10'
     
@@ -90,6 +90,42 @@ def load_cifar10_data():
     X_train = (X_train / 255.0 - mean) / std
     X_test = (X_test / 255.0 - mean) / std
     
+    return X_train, X_test, y_train, y_test """
+
+def load_cifar10_data():
+    # 设置路径
+    cifar10_dir = '/autodl-pub/data/cifar-10'
+
+    # 解压数据文件（如果尚未解压）
+    for file_name in ['cifar-10-binary.tar.gz', 'cifar-10-python.tar.gz']:
+        file_path = os.path.join(cifar10_dir, file_name)
+        if os.path.exists(file_path):
+            with tarfile.open(file_path, 'r:gz') as tar:
+                tar.extractall(path=cifar10_dir)
+
+    # 加载所有训练批次
+    X_train = []
+    y_train = []
+    for i in range(1, 6):  # 批次1到5
+        batch_path = os.path.join(cifar10_dir, f'data_batch_{i}')
+        X_batch, y_batch = load_cifar10_batch(batch_path)
+        X_train.append(X_batch)
+        y_train.append(y_batch)
+
+    # 合并所有训练批次
+    X_train = np.concatenate(X_train, axis=0)
+    y_train = np.concatenate(y_train, axis=0)
+
+    # 加载测试集
+    X_test, y_test = load_cifar10_batch(os.path.join(cifar10_dir, 'test_batch'))
+
+    # 正则化数据，与 `torchvision` 中的标准化保持一致
+    mean = np.array([0.4914, 0.4822, 0.4465]).reshape(1, 3, 1, 1)
+    std = np.array([0.2470, 0.2435, 0.2616]).reshape(1, 3, 1, 1)
+
+    X_train = (X_train / 255.0 - mean) / std
+    X_test = (X_test / 255.0 - mean) / std
+
     return X_train, X_test, y_train, y_test
 
 
