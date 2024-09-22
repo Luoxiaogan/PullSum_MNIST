@@ -93,9 +93,11 @@ def load_cifar10_batch(batch_path):
         # CIFAR-10 中每个图像为 3 x 32 x 32 的彩色图像，需要重新reshape
         X = X.reshape(-1, 3, 32, 32).astype('float32')
         return X, np.array(y)
-    
+
 def augment_data(X):
     """ 使用 imgaug 进行数据增强 """
+    from imgaug import augmenters as iaa
+
     # 定义数据增强的流水线
     seq = iaa.Sequential([
         iaa.Fliplr(0.5),  # 水平翻转 50% 的图像

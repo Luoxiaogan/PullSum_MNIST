@@ -25,10 +25,12 @@ def compute_accuracy_multiclass(model_list, X_test, y_test):
     accuracy = correct / total
     return accuracy
 
+import torch
+
 def modelwise_compute_accuracy_with_average_model(model_class, model_list, X_test, y_test):
     # 确保 X_test 和 y_test 在相同的设备上
     device = next(model_list[0].parameters()).device
-
+    
     # Step 1: Compute the average of the parameters from all models
     avg_model = model_class().to(device)  # 创建新的模型实例，并将其移动到同一设备上
     avg_state_dict = avg_model.state_dict()  # 获取新模型的状态字典
@@ -38,9 +40,12 @@ def modelwise_compute_accuracy_with_average_model(model_class, model_list, X_tes
 
     # 汇总所有模型的参数
     for model in model_list:
-        state_dict = model.state_dict()
+        state_dict = model.module.state_dict() if hasattr(model, 'module') else model.state_dict()
         for key in sum_state_dict.keys():
-            sum_state_dict[key] += state_dict[key].to(device)
+            if key in state_dict:
+                sum_state_dict[key] += state_dict[key].to(device)
+            else:
+                print(f"Warning: {key} not found in model's state dict.")
 
     # 计算平均值
     num_models = len(model_list)
@@ -54,13 +59,14 @@ def modelwise_compute_accuracy_with_average_model(model_class, model_list, X_tes
     y_test = y_test.to(device)
 
     # Step 2: Evaluate the new model's accuracy
-    avg_model.eval()
-    with torch.no_grad():
-        outputs = avg_model(X_test)
-        _, predicted = torch.max(outputs, 1)
-        accuracy = (predicted == y_test).sum().item() / y_test.size(0)
+    avg_model.eval()  # 设置模型为评估模式
+    with torch.no_grad():  # 禁用梯度计算
+        outputs = avg_model(X_test)  # 模型前向推理
+        _, predicted = torch.max(outputs, 1)  # 获取最大概率的类
+        accuracy = (predicted == y_test).sum().item() / y_test.size(0)  # 计算准确率
 
     return accuracy
+
 
 
 def compute_accuracy_with_average_model(model_list, X_test, y_test):
