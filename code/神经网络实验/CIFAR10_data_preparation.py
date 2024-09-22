@@ -6,6 +6,7 @@ import pickle
 import os
 import tarfile
 import imgaug.augmenters as iaa
+import torchfile
 
 def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=49):
     """
@@ -93,6 +94,21 @@ def load_cifar10_batch(batch_path):
         # CIFAR-10 中每个图像为 3 x 32 x 32 的彩色图像，需要重新reshape
         X = X.reshape(-1, 3, 32, 32).astype('float32')
         return X, np.array(y)
+    
+def load_cifar10_from_t7(t7_path):
+    dataset = torchfile.load(t7_path)
+
+    # 获取训练和测试数据
+    X_train = torch.from_numpy(dataset[b'trainData'][b'data'])  # 转换为张量
+    #X_train = X_train.permute(0, 2, 3, 1).numpy()  # 转换为 (N, H, W, C)
+    y_train = dataset[b'trainData'][b'labels'] - 1  # 训练标签，形状应为 (50000,)
+    
+    # 获取测试数据
+    X_test = torch.from_numpy(dataset[b'testData'][b'data'])  # 转换为张量
+    #X_test = X_test.permute(0, 2, 3, 1).numpy()  # 转换为 (N, H, W, C)
+    y_test = dataset[b'testData'][b'labels'] - 1  # 测试标签，形状应为 (10000,)
+
+    return X_train, y_train, X_test, y_test
 
 def augment_data(X):
     """ 使用 imgaug 进行数据增强 """
@@ -115,31 +131,37 @@ def augment_data(X):
 
     return X_augmented
 
-def load_cifar10_data(augment=False):
-    """ 加载 CIFAR-10 数据，augment 参数决定是否进行数据增强 """
-    # 设置路径
-    cifar10_dir = '/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10data/cifar-10-batches-py'
+def load_cifar10_data(t7_path=None, augment=False, use_t7_data=False):
+    """ 加载 CIFAR-10 数据，augment 参数决定是否进行数据增强，use_t7_data 参数决定数据源 """
+    
+    if use_t7_data:
+        # 从 t7 文件加载数据
+        X_train, y_train, X_test, y_test=load_cifar10_from_t7(t7_path=t7_path)
+        return X_train, X_test, y_train, y_test
+    else:
+        # 设置路径
+        cifar10_dir = '/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10data/cifar-10-batches-py'
 
-    # 加载所有训练批次
-    X_train = []
-    y_train = []
-    for i in range(1, 6):  # 批次1到5
-        batch_path = os.path.join(cifar10_dir, f'data_batch_{i}')
-        X_batch, y_batch = load_cifar10_batch(batch_path)
-        X_train.append(X_batch)
-        y_train.append(y_batch)
+        # 加载所有训练批次
+        X_train = []
+        y_train = []
+        for i in range(1, 6):  # 批次1到5
+            batch_path = os.path.join(cifar10_dir, f'data_batch_{i}')
+            X_batch, y_batch = load_cifar10_batch(batch_path)
+            X_train.append(X_batch)
+            y_train.append(y_batch)
 
-    # 合并所有训练批次
-    X_train = np.concatenate(X_train, axis=0)
-    y_train = np.concatenate(y_train, axis=0)
+        # 合并所有训练批次
+        X_train = np.concatenate(X_train, axis=0)
+        y_train = np.concatenate(y_train, axis=0)
+
+        # 加载测试集
+        test_batch_path = os.path.join(cifar10_dir, 'test_batch')
+        X_test, y_test = load_cifar10_batch(test_batch_path)
 
     # 如果 augment=True，则对训练集进行数据增强
     if augment:
         X_train = augment_data(X_train)
-
-    # 加载测试集
-    test_batch_path = os.path.join(cifar10_dir, 'test_batch')
-    X_test, y_test = load_cifar10_batch(test_batch_path)
 
     # 正则化数据，与 `torchvision` 中的标准化保持一致
     mean = np.array([0.4914, 0.4822, 0.4465]).reshape(1, 3, 1, 1)
