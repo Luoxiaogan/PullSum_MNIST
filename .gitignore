@@ -33,3 +33,5 @@ code/神经网络实验/CIFAR10data/cifar-10-batches-py/test_batch
 code/神经网络实验/CIFAR10data/cifar-10-batches-py/readme.html
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/readme.html
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/batches.meta.txt
+code/神经网络实验/预训练模型权重/resnet50.pt
+code/神经网络实验/预训练模型权重/resnet34.pt
