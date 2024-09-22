@@ -23,14 +23,6 @@ code/神经网络实验/CIFAR10data/cifar-10-batches-bin/data_batch_3.bin
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/data_batch_4.bin
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/data_batch_5.bin
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/test_batch.bin
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/batches.meta
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/data_batch_1
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/data_batch_2
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/data_batch_3
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/data_batch_4
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/data_batch_5
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/test_batch
-code/神经网络实验/CIFAR10data/cifar-10-batches-py/readme.html
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/readme.html
 code/神经网络实验/CIFAR10data/cifar-10-batches-bin/batches.meta.txt
 code/神经网络实验/预训练模型权重/resnet50.pt
