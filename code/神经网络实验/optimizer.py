@@ -6,8 +6,9 @@ class PullSum(Optimizer):
     def __init__(self, model_list, lr=1e-2, A=None, B=None, closure=None):
         self.model_list = model_list
         self.lr = lr
-        self.A = A.to(model_list[0].parameters().__next__().device)  # 确保A在同一设备上
-        self.B = B.to(model_list[0].parameters().__next__().device)  # 确保B在同一设备上
+        device = next(iter(model_list[0].parameters())).device
+        self.A = A.to(device)  # 确保A在同一设备上
+        self.B = B.to(device)  # 确保B在同一设备上
 
         closure()  # 先计算一遍梯度
 
@@ -31,7 +32,7 @@ class PullSum(Optimizer):
                     model_prev_gradients.append(torch.zeros_like(param, device=param.device))
             self.prev_g_list.append(model_prev_gradients)
         
-        self.correction_vector = torch.ones(A.shape[0], device=model_list[0].parameters().__next__().device)  # 确保在相同设备上
+        self.correction_vector = torch.ones(A.shape[0], device=device)  # 确保在相同设备上
 
         defaults = dict(lr=lr)
         super(PullSum, self).__init__(model_list[0].parameters(), defaults)

@@ -70,6 +70,7 @@ def new_train_PullSum(
 
     torch.manual_seed(seed_for_model)
     model_list = [model_class().to(device) for _ in range(n)]  # 确保模型在GPU上
+    model_list = [nn.DataParallel(model) for model in model_list]# 多张GPU并行
     criterion = criterion_class().to(device)  # 确保损失函数在GPU上
 
     h_data_train = h_data.copy()
