@@ -10,13 +10,6 @@ class PullSum(Optimizer):
         self.B = B.to(model_list[0].parameters().__next__().device)  # 确保B在同一设备上
 
         closure()  # 先计算一遍梯度
-            
-        self.prev_model_list = [copy.deepcopy(model) for model in model_list]
-        for i, model in enumerate(self.model_list):
-            self.prev_model_list[i].load_state_dict(model.state_dict())
-            for prev_param, param in zip(self.prev_model_list[i].parameters(), model.parameters()):
-                if param.grad is not None:
-                    prev_param.grad = param.grad.clone()
 
         self.v_list = []
         for model in self.model_list:
@@ -28,44 +21,43 @@ class PullSum(Optimizer):
                     model_gradients.append(None)
             self.v_list.append(model_gradients)
 
-        self.prev_v_list = [[v.clone() if v is not None else None for v in model_gradients] for model_gradients in self.v_list]
+        self.prev_g_list = []
+        for model in self.model_list:
+            model_prev_gradients = []
+            for param in model.parameters():
+                if param.grad is not None:
+                    model_prev_gradients.append(param.grad.clone())
+                else:
+                    model_prev_gradients.append(torch.zeros_like(param, device=param.device))
+            self.prev_g_list.append(model_prev_gradients)
         
         self.correction_vector = torch.ones(A.shape[0], device=model_list[0].parameters().__next__().device)  # 确保在相同设备上
 
-        for model_gradients in self.v_list:
-            if any(v is None for v in model_gradients):
-                raise ValueError("v_list contains None")
-        for prev_model_gradients in self.prev_v_list:
-            if any(v is None for v in prev_model_gradients):
-                raise ValueError("prev_v_list contains None")
-
         defaults = dict(lr=lr)
         super(PullSum, self).__init__(model_list[0].parameters(), defaults)
-        
-        for model_gradients in self.v_list:
-            if any(v is None for v in model_gradients):
-                raise ValueError("v_list contains None")
-        for prev_model_gradients in self.prev_v_list:
-            if any(v is None for v in prev_model_gradients):
-                raise ValueError("prev_v_list contains None")
     
     def step(self, closure):
         for model_gradients in self.v_list:
             if any(v is None for v in model_gradients):
                 raise ValueError("v_list contains None")
-        for prev_model_gradients in self.prev_v_list:
-            if any(v is None for v in prev_model_gradients):
-                raise ValueError("prev_v_list contains None")
 
         with torch.no_grad():
             self.correction_vector = torch.matmul(self.A.T, self.correction_vector)  # 使用CUDA设备的矩阵运算
             # step1: x = Ax
+            temp_params_list = []
             for i, model in enumerate(self.model_list):
-                for params, prev_params in zip(model.parameters(), zip(*[m.parameters() for m in self.prev_model_list])):
+                temp_params = []
+                for params in model.parameters():
                     weighted_sum = torch.zeros_like(params)
-                    for j, prev_param in enumerate(prev_params):
-                        weighted_sum += self.A[i, j] * prev_param
-                    params.data.copy_(weighted_sum)
+                    for j, other_model in enumerate(self.model_list):
+                        other_params = list(other_model.parameters())
+                        weighted_sum += self.A[i, j] * other_params[j].data
+                    temp_params.append(weighted_sum)
+                temp_params_list.append(temp_params)
+                # 在所有计算完成后再统一更新模型参数
+            for i, model in enumerate(self.model_list):
+                for params, temp_params in zip(model.parameters(), temp_params_list[i]):
+                    params.data.copy_(temp_params)
             
             # step2: x = x - lr * (1 / correction) * v
             for i, model in enumerate(self.model_list):
@@ -85,27 +77,34 @@ class PullSum(Optimizer):
             new_v_list = []
             for i, model in enumerate(self.model_list):
                 new_v = []
-                for idx, (param, prev_param) in enumerate(zip(model.parameters(), self.prev_model_list[i].parameters())):
+                for idx, (param, v) in enumerate(zip(model.parameters(), self.v_list[i])):
                     if param.grad is not None:
                         weighted_v_sum = torch.zeros_like(param.grad)
+                        
+                        # 计算 weighted_v_sum，即 B * v
                         for j in range(len(self.model_list)):
                             weighted_v_sum += self.B[i, j] * self.v_list[j][idx]
-                        v_update = weighted_v_sum + param.grad - prev_param.grad
+
+                        # 使用 prev_g_list 替换 prev_model_list 中的梯度
+                        prev_grad = self.prev_g_list[i][idx] if self.prev_g_list[i][idx] is not None else torch.zeros_like(param.grad)
+
+                        # 更新 v = Bv + grad - prev_grad
+                        v_update = weighted_v_sum + param.grad - prev_grad
                         new_v.append(v_update.clone())
                     else:
                         new_v.append(None)
                 new_v_list.append(new_v)
-            
             self.v_list = new_v_list
             
             # step5
             for i, model in enumerate(self.model_list):
-                self.prev_model_list[i].load_state_dict(model.state_dict())
-                for prev_param, param in zip(self.prev_model_list[i].parameters(), model.parameters()):
+                for idx, param in enumerate(model.parameters()):
                     if param.grad is not None:
-                        prev_param.grad = param.grad.clone()
-            
-            self.prev_v_list = [[v.clone() if v is not None else None for v in self.v_list[i]] for i in range(len(self.model_list))]
+                        # 更新 prev_g_list 的梯度为当前 model 的梯度的拷贝
+                        self.prev_g_list[i][idx] = param.grad.clone()
+                    else:
+                        # 如果当前参数没有梯度，设置为全零张量
+                        self.prev_g_list[i][idx] = torch.zeros_like(param, device=param.device)
 
         return loss
 
