@@ -51,13 +51,14 @@ def new_train_PullSum(
         y_test_data=None,
         compute_accuracy=None,
         batch_size=None,  # 新增参数
-        show_graph=True
+        show_graph=True,
+        cuda_number = 5
         ):
 
     lr = n * lr
 
     # 确保使用GPU（如果可用）
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda0" if torch.cuda.is_available() else "cpu")
     A = torch.tensor(A, dtype=torch.float32).to(device)
     B = torch.tensor(B, dtype=torch.float32).to(device)
     h_data = [x.to(device) for x in X_train_data]  # 确保训练数据在GPU上

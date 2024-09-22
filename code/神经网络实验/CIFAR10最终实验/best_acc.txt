@@ -1,0 +1,1 @@
+EPOCH=44,best_acc= 89.300%
