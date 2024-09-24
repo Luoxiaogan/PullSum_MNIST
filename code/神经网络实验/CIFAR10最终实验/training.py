@@ -58,7 +58,7 @@ def new_train_PullSum(
     lr = n * lr
 
     # 确保使用GPU（如果可用）
-    device = torch.device("cuda0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     A = torch.tensor(A, dtype=torch.float32).to(device)
     B = torch.tensor(B, dtype=torch.float32).to(device)
     h_data = [x.to(device) for x in X_train_data]  # 确保训练数据在GPU上
