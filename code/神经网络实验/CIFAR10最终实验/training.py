@@ -57,7 +57,7 @@ def six_GPU_train_PullSum(
     lr = n * lr
 
     # cuda0
-    device = torch.device("cuda0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # 将 A, B, X_test_tensor 和 y_test_tensor 放在 cuda0
     A = torch.tensor(A, dtype=torch.float32).to(device)
@@ -66,8 +66,8 @@ def six_GPU_train_PullSum(
     y_test_tensor = y_test_data.to(device)
 
     # 将 h_data 和 y_data 放在 cuda1 到 cuda5
-    h_data = [data.to(f"cuda:{i + 1}") for i, data in enumerate(h_data)]
-    y_data = [label.to(f"cuda:{i + 1}") for i, label in enumerate(y_data)]
+    h_data = [data.to(f"cuda:{i + 1}") for i, data in enumerate(X_train_data)]
+    y_data = [label.to(f"cuda:{i + 1}") for i, label in enumerate(y_train_data)]
 
     # 在各自的 GPU 上构建训练的 DataLoader
     train_loaders = [
@@ -75,7 +75,7 @@ def six_GPU_train_PullSum(
             torch.utils.data.TensorDataset(h_data[i], y_data[i]),
             batch_size=batch_size,
             shuffle=True,
-            num_workers=4
+            num_workers=0
         )
         for i in range(len(h_data))
     ]
@@ -86,18 +86,19 @@ def six_GPU_train_PullSum(
 
     criterion_list = [criterion_class().to(f"cuda:{i}") for i in range(6)]
 
-    #模型进行预训练——参数初始化
-    for i,model in enumerate(model_list):
-        for param in model.parameters():
-            param.requires_grad = True
-        model.zero_grad()
-        output = model(h_data_train[i])
-        loss = criterion_list[i+1](output, y_data_train[i])
-        loss.backward()
-    
-    print("初始化成功!")
-    # 在 cuda0 上创建损失函数
-    criterion = criterion_class().to(device)
+    def closure():
+        total_loss = 0.0
+        for i, model in enumerate(model_list):
+            model.zero_grad()
+            for batch_h, batch_y in train_loaders[i]:
+                batch_h = batch_h.to(f"cuda:{i + 1}")
+                batch_y = batch_y.to(f"cuda:{i + 1}")
+                output = model(batch_h)
+                loss = criterion_list[i + 1](output, batch_y)
+                loss.backward()
+                total_loss += loss.to('cuda:0').item()
+            total_loss = total_loss / len(train_loaders[i])
+        return total_loss / len(model_list)
 
     # 直接在 cuda0 上创建 h_data_train 和 y_data_train 的副本
     h_data_train = [data.clone().to(device) for data in h_data]
@@ -106,28 +107,17 @@ def six_GPU_train_PullSum(
     # 拼接数据
     X_data_for_accuracy_compute = torch.cat(h_data_train, dim=0)
     y_data_for_accuracy_compute = torch.cat(y_data_train, dim=0)
-
-
-    def closure():
-        total_loss = 0
-        for i, model in enumerate(model_list):
-            for param in model.parameters():
-                param.requires_grad = True
-            model.zero_grad()
-            output = model(h_data_train[i])
-            loss = criterion(output, y_data_train[i])
-            loss.backward()
-            total_loss += loss.item()
-        return total_loss / len(model_list)
     
-    optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
+    optimizer = PullSum_for_try(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
     #后面的batch中不需要更改optimizer, 只需要更改h_data_train和y_data_train的定义就行了
+
+    print("optimizer初始化成功!")
 
     train_loss_history = []
     train_accuracy_history = []
     test_accuracy_history = []
 
-    #准备如果使用batch的话，的loader
+    #这一段没有用了
     h_data_batches = []
     y_data_batches = []
     train_loaders = [torch.utils.data.DataLoader(torch.utils.data.TensorDataset(h_data[i], y_data[i]),batch_size=batch_size,shuffle=True) for i in range(n)]
