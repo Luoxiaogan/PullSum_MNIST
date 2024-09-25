@@ -8,6 +8,20 @@ import tarfile
 import imgaug.augmenters as iaa
 import torchfile
 
+
+""" import tarfile
+
+# 路径信息
+tar_file_path = "/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10data/cifar-10-python.tar.gz"
+extract_path = "/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10最终实验/cifar-10-python/cifar-10-batches-py"
+
+# 打开 tar.gz 文件
+with tarfile.open(tar_file_path, "r:gz") as tar:
+    tar.extractall(path=extract_path)  # 将文件解压到指定路径
+
+print("文件解压成功!") """
+
+
 def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=49):
     """
     使用狄利克雷分布将两个数据集进行混合。
@@ -58,7 +72,7 @@ def mix_datasets_with_dirichlet(h_data1, y_data1, h_data2, y_data2, alpha, seed=
 def load_cifar10_data(augment=False):
     """ 加载 CIFAR-10 数据 """
     # 设置路径
-    cifar10_dir = '/root/GanLuo/pytorch-cifar10-resnet18/cifar-10-python'
+    cifar10_dir = '/root/GanLuo/PullSum_MNIST/code/神经网络实验/CIFAR10最终实验/cifar-10-python/cifar-10-batches-py'
 
     transform_train = transforms.Compose([
     transforms.RandomCrop(32, padding=4),  #先四周填充0，在吧图像随机裁剪成32*32
