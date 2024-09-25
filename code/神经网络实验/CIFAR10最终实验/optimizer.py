@@ -30,7 +30,7 @@ class PullSum_for_try(Optimizer):
 
         self.prev_v_list = [[v.clone() if v is not None else None for v in model_gradients] for model_gradients in self.v_list]
         
-        self.correction_vector = torch.ones(A.shape[0], device=model_list[0].parameters().__next__().device)  # 确保在相同设备上
+        self.correction_vector = torch.ones(A.shape[0], device=A.device)
 
         for model_gradients in self.v_list:
             if any(v is None for v in model_gradients):
@@ -48,8 +48,6 @@ class PullSum_for_try(Optimizer):
         for prev_model_gradients in self.prev_v_list:
             if any(v is None for v in prev_model_gradients):
                 raise ValueError("prev_v_list contains None")
-            
-        print("optimizer初始化成功!")
     
     def step(self, closure):
         for model_gradients in self.v_list:
@@ -67,7 +65,7 @@ class PullSum_for_try(Optimizer):
                     weighted_sum = torch.zeros_like(params).to('cuda:0')
                     for j, prev_param in enumerate(prev_params):
                         prev_param_cuda0 = prev_param.to('cuda:0')
-                        weighted_sum += self.A[i, j] * prev_param
+                        weighted_sum += self.A[i, j] * prev_param_cuda0
                     params.data.copy_(weighted_sum.to(params.device))
                     del prev_param_cuda0
             
@@ -76,8 +74,9 @@ class PullSum_for_try(Optimizer):
                 for param, v in zip(model.parameters(), self.v_list[i]):
                     if v is not None:
                         correction = self.correction_vector[i]
-                        update = self.lr * (1 / correction) * v
-                        param.data -= update
+                        v_cuda0 = v.to('cuda:0')
+                        update = self.lr * (1 / correction) * v_cuda0
+                        param.data -= update.to(param.device)   
 
         # step3: compute g
         for model in self.model_list:
@@ -87,13 +86,21 @@ class PullSum_for_try(Optimizer):
         with torch.no_grad():
             # step4: v = Bv + g - prev_g
             new_v_list = []
+            # 首先将 self.v_list 的每个子列表都转换到 cuda:0 上
+            v_list_cuda0 = [
+                [v_param.to('cuda:0') for v_param in self.v_list[j]]
+                for j in range(len(self.model_list))
+            ]
             for i, model in enumerate(self.model_list):
                 new_v = []
                 for idx, (param, prev_param) in enumerate(zip(model.parameters(), self.prev_model_list[i].parameters())):
                     if param.grad is not None:
-                        weighted_v_sum = torch.zeros_like(param.grad)
+
+                        weighted_v_sum = torch.zeros_like(param.grad).to('cuda:0')
+
                         for j in range(len(self.model_list)):
-                            weighted_v_sum += self.B[i, j] * self.v_list[j][idx]
+                            weighted_v_sum += self.B[i, j] * v_list_cuda0[j][idx]
+                        weighted_v_sum = weighted_v_sum.to(param.device)
                         v_update = weighted_v_sum + param.grad - prev_param.grad
                         new_v.append(v_update.clone())
                     else:
