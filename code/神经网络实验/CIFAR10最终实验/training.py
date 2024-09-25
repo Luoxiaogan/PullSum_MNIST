@@ -50,7 +50,6 @@ def six_GPU_train_PullSum(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None,
         batch_size=None,  # 新增参数
         show_graph=True
         ):
@@ -69,7 +68,7 @@ def six_GPU_train_PullSum(
     test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
     test_loader = DataLoader(
         test_dataset,
-        batch_size = batch_size,
+        batch_size = 100,
         shuffle=False,
         num_workers=0
     )
@@ -116,13 +115,22 @@ def six_GPU_train_PullSum(
     # 拼接数据
     X_data_for_accuracy_compute = torch.cat(h_data_train, dim=0)
     y_data_for_accuracy_compute = torch.cat(y_data_train, dim=0)
+    train_accuracy_dataset = TensorDataset(X_data_for_accuracy_compute, y_data_for_accuracy_compute)
+    train_accuracy_compute_loader = DataLoader(
+        train_accuracy_dataset,
+        batch_size=100,
+        shuffle=False, 
+        num_workers=0
+    )
     
     optimizer = PullSum_for_try(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
     #后面的batch中不需要更改optimizer, 只需要更改h_data_train和y_data_train的定义就行了
 
     print("optimizer初始化成功!")
 
-    train_loss_history = []
+    training_loss_history = []
+    training_accuracy_history = []
+    test_accuracy_history = []
 
     def closure_for_batch(batch_h_list, batch_y_list):
         loss_list = []
@@ -134,6 +142,48 @@ def six_GPU_train_PullSum(
             loss_list.append(loss.unsqueeze(0).to('cuda:0'))
         total_loss = torch.cat(loss_list).sum().item()
         return total_loss / len(model_list)
+    
+    def compute_avg_model():
+        new_model = model_class().to("cuda:0")
+        with torch.no_grad():
+            for new_param, *all_params in zip(new_model.parameters(), *(m.parameters() for m in model_list)):
+                avg_param = torch.zeros_like(new_param).to("cuda:0")
+                for param in all_params:
+                    param_cuda0 = param.to("cuda:0") 
+                    avg_param += param_cuda0
+                    del param_cuda0
+                avg_param /= len(model_list)
+                new_param.data.copy_(avg_param)
+                del avg_param
+        return new_model
+    
+    def c_accuracy(model=None,loader=None,device='cuda:0'):
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for batch_h, batch_y in loader:
+                batch_h = batch_h.to(device)
+                batch_y = batch_y.to(device)
+                output = model(batch_h)
+                _, predicted = torch.max(output.data, 1)
+                total += batch_y.size(0)
+                correct += (predicted == batch_y).sum().item()
+        accuracy = correct / total
+        return accuracy 
+
+    def average_accuracy(model_list, loader, device_prefix='cuda', start_idx=1, num_gpus=5):
+        total_accuracy = 0.0
+
+        # 遍历每个模型和设备
+        for i in range(start_idx, num_gpus + start_idx):
+            device = f'{device_prefix}:{i}'
+            accuracy = c_accuracy(model=model_list[i - start_idx], loader=loader, device=device)
+            total_accuracy += accuracy
+
+        # 计算平均准确率
+        avg_accuracy = total_accuracy / num_gpus
+        return avg_accuracy      
 
     progress_bar = tqdm(range(epochs), desc="Training Progress")
 
@@ -154,21 +204,41 @@ def six_GPU_train_PullSum(
                 loss = optimizer.step(lambda: closure_for_batch(batch_h_list, batch_y_list))
                 epoch_loss += loss
             epoch_loss = epoch_loss / len(train_loaders[0])
-        train_loss_history.append(epoch_loss / len(model_list))
+        training_loss_history.append(epoch_loss)
+
+        #avg_model = compute_avg_model()
+        #test_accuracy = c_accuracy(model=avg_model,loader=test_loader)
+        #training_accuracy = c_accuracy(model=avg_model,loader=train_accuracy_compute_loader)
+        test_accuracy = average_accuracy(model_list=model_list, loader=test_loader, start_idx=1, num_gpus=5)#c_accuracy(model=model_list[4],loader=test_loader,device='cuda:5')
+        training_accuracy = average_accuracy(model_list=model_list, loader=train_accuracy_compute_loader, start_idx=1, num_gpus=5)#c_accuracy(model=model_list[4],loader=train_accuracy_compute_loader,device='cuda:5')
+        test_accuracy_history.append(test_accuracy)
+        training_accuracy_history.append(training_accuracy)
+
+        #avg_model.to('cpu')
+        #del avg_model
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
-        progress_bar.set_postfix(epoch=epoch + 1, loss=f"{train_loss_history[-1]:.10f}")
+        progress_bar.set_postfix(epoch=epoch + 1, training_loss=f"{training_loss_history[-1]:.10f}", training_accuracy=f"{100*training_accuracy_history[-1]:.10f}%", test_accuracy=f"{100*test_accuracy_history[-1]:.10f}%")
     
     if show_graph:
-        plt.plot(train_loss_history, color='r')
+        plt.subplot(1,2,1)
+        plt.plot(training_loss_history, color='r')
         plt.title('Train Loss History')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
 
-        plt.title(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
-        plt.show()
+        plt.subplot(1,2,2)
+        plt.plot(training_accuracy_history, color='r',label='training')
+        plt.plot(test_accuracy_history, color='b',label='test')
+        plt.title('Accuracy Comparision')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
 
-    return train_loss_history
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.90])
+        plt.show()
+    return training_loss_history,training_accuracy_history, test_accuracy_history
 
 def new_train_PullSum( 
         n=5,
