@@ -463,35 +463,11 @@ def new_train_PullSum(
     y_test_tensor = y_test_data.to(device)  # 确保测试标签在GPU上
 
     torch.manual_seed(seed_for_model)
-    model_list = [model_class().to(device) for _ in range(n)]  # 确保模型在GPU上
-    #model_list = [nn.DataParallel(model) for model in model_list]# 多张GPU并行
+    model_list = [model_class().to(device) for _ in range(n)]
     criterion = criterion_class().to(device)  # 确保损失函数在GPU上
-
-    h_data_train = h_data.copy()
-    y_data_train = y_data.copy()
 
     X_data_for_accuracy_compute = torch.cat(h_data, dim=0)  # 在第0维上连接
     y_data_for_accuracy_compute = torch.cat(y_data, dim=0)  # 在第0维上连接
-
-
-    def closure():
-        total_loss = 0
-        for i, model in enumerate(model_list):
-            for param in model.parameters():
-                param.requires_grad = True
-            model.zero_grad()
-            output = model(h_data_train[i])
-            loss = criterion(output, y_data_train[i])
-            loss.backward()
-            total_loss += loss.item()
-        return total_loss / len(model_list)
-    
-    optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
-    #后面的batch中不需要更改optimizer, 只需要更改h_data_train和y_data_train的定义就行了
-
-    train_loss_history = []
-    train_accuracy_history = []
-    test_accuracy_history = []
 
     #准备如果使用batch的话，的loader
     h_data_batches = []
@@ -508,6 +484,29 @@ def new_train_PullSum(
 
         h_data_batches.append(h_data_batch)
         y_data_batches.append(y_data_batch)
+
+    h_data_train = h_data_batches[0]
+    y_data_train = y_data_batches[0]
+
+    def closure():
+        total_loss = 0
+        for i, model in enumerate(model_list):
+            for param in model.parameters():
+                param.requires_grad = True
+            model.zero_grad()
+            output = model(h_data_train[i])
+            loss = criterion(output, y_data_train[i])
+            loss.backward()
+            total_loss += loss.item()
+        return total_loss / len(model_list)
+    
+    optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
+    
+    print("optimizer初始化成功!")
+
+    train_loss_history = []
+    train_accuracy_history = []
+    test_accuracy_history = []
 
     # 创建 tqdm 对象显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
@@ -534,6 +533,8 @@ def new_train_PullSum(
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{train_loss_history[-1]:.10f}",trian_accuracy=f"{100 * train_accuracy:.10f}%", test_accuracy=f"{100 * test_accuracy:.10f}%")
+
+        yield train_loss_history, train_accuracy_history, test_accuracy_history
     
     if show_graph:
         # 创建一个2行2列的子图布局
@@ -572,7 +573,7 @@ def new_train_PullSum(
         plt.show()
 
 
-    return train_loss_history, test_accuracy_history
+    return train_loss_history, train_accuracy_history, test_accuracy_history
 
 
 
