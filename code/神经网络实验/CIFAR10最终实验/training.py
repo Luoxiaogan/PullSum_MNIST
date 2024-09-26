@@ -17,6 +17,57 @@ import copy
 from concurrent.futures import ProcessPoolExecutor
 from IPython.display import clear_output
 import time
+from resnet_model import old_ResNet18, new_ResNet18, init_params
+
+
+def CA(model_class,model_list, X_test, y_test, batch_size=100):
+    # 确保 X_test 和 y_test 在相同的设备上
+    device = next(model_list[0].parameters()).device
+
+    # Step 1: Compute the average of the parameters from all models
+    avg_model = model_class().to(device)  # 创建新的模型实例，并将其移动到同一设备上
+    avg_state_dict = avg_model.state_dict()  # 获取新模型的状态字典
+
+    # 初始化 sum_state_dict
+    sum_state_dict = {key: torch.zeros_like(param).to(device) for key, param in avg_state_dict.items()}
+
+    # 汇总所有模型的参数
+    for model in model_list:
+        state_dict = model.state_dict()
+        for key in sum_state_dict.keys():
+            sum_state_dict[key] += state_dict[key].to(device)
+
+    # 计算平均值
+    num_models = len(model_list)
+    avg_state_dict = {key: value / num_models for key, value in sum_state_dict.items()}
+
+    # 将平均参数加载到新模型中
+    avg_model.load_state_dict(avg_state_dict)
+
+    # 确保测试数据在正确的设备上
+    X_test = X_test.to(device)
+    y_test = y_test.to(device)
+
+    # Step 2: Create test DataLoader with batch_size=100
+    test_dataset = torch.utils.data.TensorDataset(X_test, y_test)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+    # Step 3: Evaluate the new model's accuracy using test_loader
+    avg_model.eval()
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = avg_model(inputs)
+            _, predicted = torch.max(outputs, 1)
+            correct += (predicted == labels).sum().item()
+            total += labels.size(0)
+
+    accuracy = correct / total
+
+    return accuracy
 
 """ m = loadmat('MNIST_digits_2_4.mat')
 X_train = m['X_train']
@@ -446,10 +497,13 @@ def new_train_PullSum(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
-        compute_accuracy=None,
+        #compute_accuracy=None,
         batch_size=None,  # 新增参数
-        show_graph=True
+        show_graph=True,
+        try_init=False
         ):
+    
+    compute_accuracy = lambda model_class, model_list, X_test, y_test, batch_size=100: CA(model_class=model_class, model_list=model_list, X_test=X_test, y_test=y_test, batch_size=batch_size)
 
     lr = n * lr
 
@@ -504,6 +558,12 @@ def new_train_PullSum(
     
     print("optimizer初始化成功!")
 
+    if try_init:
+        for model in model_list:
+            init_params(model)
+        print("自定义的模型初始化成功!")
+    clear_output(wait=True)
+
     train_loss_history = []
     train_accuracy_history = []
     test_accuracy_history = []
@@ -526,9 +586,9 @@ def new_train_PullSum(
                 epoch_loss += loss
             epoch_loss = epoch_loss/len(train_loaders[0])#标准化
         train_loss_history.append(epoch_loss / len(model_list))#另一个标准化
-        test_accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
+        test_accuracy = compute_accuracy(model_class,model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
         test_accuracy_history.append(test_accuracy)
-        train_accuracy = compute_accuracy(model_list, X_data_for_accuracy_compute, y_data_for_accuracy_compute)  # 计算训练集上的准确率
+        train_accuracy = compute_accuracy(model_class,model_list, X_data_for_accuracy_compute, y_data_for_accuracy_compute)  # 计算训练集上的准确率
         train_accuracy_history.append(train_accuracy)
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
