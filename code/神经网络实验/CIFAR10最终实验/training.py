@@ -15,6 +15,8 @@ import torch.nn as nn
 import matplotlib.pyplot as plt
 import copy
 from concurrent.futures import ProcessPoolExecutor
+from IPython.display import clear_output
+import time
 
 """ m = loadmat('MNIST_digits_2_4.mat')
 X_train = m['X_train']
@@ -108,7 +110,6 @@ def six_GPU_train_PullSum(
             total_loss = total_loss / len(train_loaders[i])
         return total_loss / len(model_list)
 
-    # 直接在 cuda0 上创建 h_data_train 和 y_data_train 的副本
     h_data_train = [data.clone().to(device) for data in h_data]
     y_data_train = [label.clone().to(device) for label in y_data]
 
@@ -239,6 +240,198 @@ def six_GPU_train_PullSum(
         plt.tight_layout(rect=[0, 0.03, 1, 0.90])
         plt.show()
     return training_loss_history,training_accuracy_history, test_accuracy_history
+
+def new_new_train_PullSum( 
+        n=5,
+        A=None,
+        B=None,
+        model_class=None,
+        seed_for_model=42,
+        criterion_class=nn.CrossEntropyLoss,
+        epochs=10,
+        lr=0.1,
+        X_train_data=None,
+        y_train_data=None,
+        X_test_data=None,
+        y_test_data=None,
+        compute_accuracy=None,
+        batch_size=None,  # 新增参数
+        show_graph=True
+        ):
+
+    lr = n * lr
+
+    # 确保使用GPU（如果可用）
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    A = torch.tensor(A, dtype=torch.float32).to(device)
+    B = torch.tensor(B, dtype=torch.float32).to(device)
+    h_data = [x.to(device) for x in X_train_data]  # 确保训练数据在GPU上
+    y_data = [y.to(device) for y in y_train_data]  # 确保训练标签在GPU上
+    X_test_tensor = X_test_data.to(device)  # 确保测试数据在GPU上
+    y_test_tensor = y_test_data.to(device)  # 确保测试标签在GPU上
+
+    test_dataset = TensorDataset(X_test_tensor, y_test_tensor)
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size = 100,
+        shuffle=False,
+        num_workers=0
+    )
+
+    train_loaders = [
+        torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(h_data[i], y_data[i]),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0
+        )
+        for i in range(len(h_data))
+    ]
+
+    torch.manual_seed(seed_for_model)
+    model_list = [model_class().to(device) for _ in range(n)]
+    criterion = criterion_class().to(device)
+
+    def closure():
+        total_loss = 0.0
+        for i, model in enumerate(model_list):
+            model.zero_grad()
+            for batch_h, batch_y in train_loaders[i]:
+                output = model(batch_h)
+                loss = criterion(output, batch_y)
+                loss.backward()
+                total_loss += loss.item()
+            total_loss = total_loss / len(train_loaders[i])
+        return total_loss / len(model_list)
+
+    X_data_for_accuracy_compute = torch.cat(h_data, dim=0)  # 在第0维上连接
+    y_data_for_accuracy_compute = torch.cat(y_data, dim=0)  # 在第0维上连接
+    train_accuracy_dataset = TensorDataset(X_data_for_accuracy_compute, y_data_for_accuracy_compute)
+
+    train_accuracy_compute_loader = DataLoader(
+        train_accuracy_dataset,
+        batch_size=100,
+        shuffle=False, 
+        num_workers=0
+    )
+
+    optimizer = PullSum_for_try(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
+
+    print("optimizer初始化成功!")
+
+    training_loss_history = []
+    training_accuracy_history = []
+    test_accuracy_history = []
+
+    def closure_for_batch(batch_h_list, batch_y_list):
+        loss_list = []
+        for i, model in enumerate(model_list):
+            model.zero_grad()
+            output = model(batch_h_list[i])
+            loss = criterion(output, batch_y_list[i])
+            loss.backward()
+            loss_list.append(loss.unsqueeze(0))
+        total_loss = torch.cat(loss_list).sum().item()
+        return total_loss / len(model_list)
+    
+    def c_accuracy(model=None,loader=None):
+        model.eval()
+        correct = 0
+        total = 0
+        with torch.no_grad():
+            for batch_h, batch_y in loader:
+                output = model(batch_h)
+                _, predicted = torch.max(output.data, 1)
+                total += batch_y.size(0)
+                correct += (predicted == batch_y).sum().item()
+        accuracy = correct / total
+        return accuracy 
+
+    # 创建 tqdm 对象显示训练进度
+    #progress_bar = tqdm(range(epochs), desc="Training Progress")
+    print("开始训练!")
+
+    for epoch in range(epochs):
+        epoch_loss = 0
+        
+        if batch_size is None:
+            # 无批处理：直接使用整个数据进行训练
+            loss = optimizer.step(closure)
+            epoch_loss = loss
+        else:# 批处理
+            j=0
+            for batch_tuple in zip(*train_loaders):
+                batch_h_list = []
+                batch_y_list = []
+                for i in range(5):
+                    batch_h, batch_y = batch_tuple[i]
+                    batch_h_list.append(batch_h)
+                    batch_y_list.append(batch_y)
+                loss = optimizer.step(lambda: closure_for_batch(batch_h_list, batch_y_list))
+                epoch_loss += loss
+                print(f"batch:{j}成功！")
+                j=j+1
+            epoch_loss = epoch_loss / len(train_loaders[0])
+        
+        print("训练完了所有的batch")
+        clear_output(wait=True)
+
+        training_loss_history.append(epoch_loss)
+        test_accuracy = c_accuracy(model=model_list[4],loader=test_loader)
+        training_accuracy = c_accuracy(model=model_list[4],loader=train_accuracy_compute_loader)
+        test_accuracy_history.append(test_accuracy)
+        training_accuracy_history.append(training_accuracy)
+
+        print("完成正确率计算!")
+        clear_output(wait=True)
+        print("hao")
+        print(epoch_loss,test_accuracy,training_accuracy)
+
+
+        # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
+        #progress_bar.set_postfix(epoch=epoch + 1, loss=f"{training_loss_history[-1]:.10f}",trian_accuracy=f"{100 * training_accuracy:.10f}%", test_accuracy=f"{100 * test_accuracy:.10f}%")
+    
+    print("训练完了所有的epoch")
+    
+    if show_graph:
+        # 创建一个2行2列的子图布局
+        plt.subplot(1, 2, 1)
+        plt.plot(training_loss_history, color='r')
+        plt.title('Train Loss History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(training_accuracy_history, color='b')
+        plt.title('Train Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.90])  # 调整顶部边距
+        plt.show()
+
+        plt.subplot(1, 2, 1)
+        plt.plot(test_accuracy_history, color='b')
+        plt.title('Test Accuracy History')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+
+        plt.subplot(1, 2, 2)
+        plt.plot(training_accuracy_history, color='blue', label='Train')
+        plt.plot(test_accuracy_history, color='red', label='Test')
+        plt.title('Comparison')
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy')
+        plt.legend()
+
+        plt.suptitle(f'PullSum, n={n}, lr={lr:.6f}, batch_size={batch_size}')
+        plt.tight_layout(rect=[0, 0.03, 1, 0.90])  # 调整顶部边距
+        plt.show()
+
+
+    return training_loss_history, test_accuracy_history
+
 
 def new_train_PullSum( 
         n=5,
