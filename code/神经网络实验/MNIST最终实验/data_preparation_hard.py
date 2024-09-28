@@ -290,3 +290,61 @@ def prepare_node_10_hard_linear_mix(p1=0.5, seed=42):
     y_test = torch.cat((y_test1, y_test2), dim=0)
     
     return h_data_mixed, y_data_mixed, X_test, y_test
+
+def prepare_data_node_20():
+    """ 均匀分布 """
+    X_train, X_test, y_train, y_test = load_mnist_data()
+
+    # 转换为 PyTorch 张量
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.long)
+    y_test = torch.tensor(y_test, dtype=torch.long)
+
+    # 打乱训练数据
+    perm = torch.randperm(X_train.size(0))  # 随机排列索引
+    X_train = X_train[perm]
+    y_train = y_train[perm]
+
+    # 计算每个节点的样本数量
+    num_samples = X_train.size(0)
+    samples_per_node = num_samples // 20  # 每个节点的样本数量
+
+    # 保留均匀分配的数据
+    X_train = X_train[:samples_per_node * 20]
+    y_train = y_train[:samples_per_node * 20]
+
+    # 将数据分配到 20 个节点
+    X_train_list = torch.split(X_train, samples_per_node)
+    y_train_list = torch.split(y_train, samples_per_node)
+
+    return X_train_list, y_train_list, X_test, y_test
+
+def prepare_data_node(n):
+    """ 均匀分布到 n 个节点 """
+    X_train, X_test, y_train, y_test = load_mnist_data()
+
+    # 转换为 PyTorch 张量
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.long)
+    y_test = torch.tensor(y_test, dtype=torch.long)
+
+    # 打乱训练数据
+    perm = torch.randperm(X_train.size(0))  # 随机排列索引
+    X_train = X_train[perm]
+    y_train = y_train[perm]
+
+    # 计算每个节点的样本数量
+    num_samples = X_train.size(0)
+    samples_per_node = num_samples // n  # 每个节点的样本数量
+
+    # 保留均匀分配的数据
+    X_train = X_train[:samples_per_node * n]
+    y_train = y_train[:samples_per_node * n]
+
+    # 将数据分配到 n 个节点
+    X_train_list = torch.split(X_train, samples_per_node)
+    y_train_list = torch.split(y_train, samples_per_node)
+
+    return X_train_list, y_train_list, X_test, y_test

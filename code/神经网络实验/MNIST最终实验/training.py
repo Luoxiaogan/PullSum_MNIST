@@ -228,8 +228,22 @@ def train_PullSum(
     
     optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
 
+    model_first = model_class().to(device)
+    for param in model_first.parameters():
+        param.requires_grad = True
+    model_first.zero_grad()
+    output = model_first(h_data[0])
+    loss = criterion(output, y_data[0])
+    loss.backward()
+    output_test = model_first(X_test_tensor)
+    _, predicted = torch.max(output_test, 1)
+    accuracy = (predicted == y_test_tensor).float().mean()
+
     loss_history = []
     accuracy_history = []
+
+    loss_history.append(loss.item())
+    accuracy_history.append(accuracy.item())
 
     # 创建 tqdm 对象显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
