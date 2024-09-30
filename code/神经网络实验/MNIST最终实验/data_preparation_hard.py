@@ -440,3 +440,89 @@ def prepare_node_15_hard_linear_mix(p1=0.5, seed=42):
     y_test = torch.cat((y_test1, y_test2), dim=0)
     
     return h_data_mixed, y_data_mixed, X_test, y_test
+
+def prepare_node_20_hard():
+    X_train, X_test, y_train, y_test = load_mnist_data()
+
+    # 转换为PyTorch张量
+    X_train = torch.tensor(X_train, dtype=torch.float32)
+    X_test = torch.tensor(X_test, dtype=torch.float32)
+    y_train = torch.tensor(y_train, dtype=torch.long)
+    y_test = torch.tensor(y_test, dtype=torch.long)
+
+    # 按类别分配数据
+    X_train_classified = [[] for _ in range(10)]
+    y_train_classified = [[] for _ in range(10)]
+    
+    for i in range(len(y_train)):
+        label = y_train[i].item()
+        X_train_classified[label].append(X_train[i])
+        y_train_classified[label].append(y_train[i])
+
+    # 将列表转为张量
+    X_train_list = [torch.stack(class_data) for class_data in X_train_classified]
+    y_train_list = [torch.tensor(class_labels, dtype=torch.long) for class_labels in y_train_classified]
+
+    # 分配到20个节点
+    h_data = [[] for _ in range(20)]
+    y_data = [[] for _ in range(20)]
+    
+    # 分配0到9的数据到节点0到9
+    for i in range(10):
+        h_data[i] = X_train_list[i]
+        y_data[i] = y_train_list[i]
+
+    # 将0到9的数据分配到节点10到19
+    for i in range(10):
+        h_data[i + 10] = X_train_list[i]
+        y_data[i + 10] = y_train_list[i]
+
+    return h_data, y_data, X_test, y_test
+
+def prepare_node_20_hard_linear_mix(p1=0.5, seed=42):
+    """ 
+    p1 是高异质性数据抽样的比例，p2=1-p1 是均匀分布数据抽样的比例
+    """
+    # 获取原始数据
+    h_data1, y_data1, X_test1, y_test1 = prepare_node_20_hard()  # 大异质性，对应 p1
+    h_data2, y_data2, X_test2, y_test2 = prepare_data_node(n=20)  # 均匀，对应 p2
+    
+    p2 = 1 - p1
+    
+    # 设置随机种子
+    np.random.seed(seed)
+
+    h_data_mixed = []
+    y_data_mixed = []
+
+    # 依次对每个节点进行抽样
+    for h1, y1, h2, y2 in zip(h_data1, y_data1, h_data2, y_data2):
+        # 确定每个数据集的抽样数量
+        len_h1 = len(h1)
+        len_h2 = len(h2)
+        
+        # 计算抽样数量（不能整除时向下取整）
+        sample_size_h1 = int(len_h1 * p1)
+        sample_size_h2 = int(len_h2 * p2)
+        
+        # 从 h1, y1 和 h2, y2 中分别抽样
+        indices_h1 = np.random.choice(len_h1, sample_size_h1, replace=False)
+        indices_h2 = np.random.choice(len_h2, sample_size_h2, replace=False)
+        
+        h1_sampled = h1[indices_h1]
+        y1_sampled = y1[indices_h1]
+        h2_sampled = h2[indices_h2]
+        y2_sampled = y2[indices_h2]
+
+        # 将两个抽样结果拼接
+        h_mixed = torch.cat([h1_sampled, h2_sampled], dim=0)
+        y_mixed = torch.cat([y1_sampled, y2_sampled], dim=0)
+
+        h_data_mixed.append(h_mixed)
+        y_data_mixed.append(y_mixed)
+    
+    # 测试数据直接拼接
+    X_test = torch.cat((X_test1, X_test2), dim=0)
+    y_test = torch.cat((y_test1, y_test2), dim=0)
+    
+    return h_data_mixed, y_data_mixed, X_test, y_test
