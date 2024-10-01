@@ -518,8 +518,13 @@ def prepare_node_20_hard_linear_mix(p1=0.5, seed=42):
         h_mixed = torch.cat([h1_sampled, h2_sampled], dim=0)
         y_mixed = torch.cat([y1_sampled, y2_sampled], dim=0)
 
-        h_data_mixed.append(h_mixed)
-        y_data_mixed.append(y_mixed)
+        # 对 h_mixed 和 y_mixed 进行洗牌
+        combined = list(zip(h_mixed, y_mixed))
+        np.random.shuffle(combined)
+        h_mixed, y_mixed = zip(*combined)
+
+        h_data_mixed.append(torch.stack(h_mixed))
+        y_data_mixed.append(torch.tensor(y_mixed))
     
     # 测试数据直接拼接
     X_test = torch.cat((X_test1, X_test2), dim=0)
