@@ -195,11 +195,15 @@ def train_PullSum(
         y_train_data=None,
         X_test_data=None,
         y_test_data=None,
+        batch_size=None,
         compute_accuracy=None,
         show_graph=True
         ):
     
     lr = n * lr
+
+    if batch_size==None:
+        batch_size = int(50000/n)
 
     # 确保使用GPU（如果可用）
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -214,6 +218,16 @@ def train_PullSum(
     model_list = [model_class().to(device) for _ in range(n)]  # 确保模型在GPU上
     criterion = criterion_class().to(device)  # 确保损失函数在GPU上
 
+    train_loaders = [
+        torch.utils.data.DataLoader(
+            torch.utils.data.TensorDataset(h_data[i], y_data[i]),
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=0
+        )
+        for i in range(len(h_data))
+    ]
+
     def closure():
         total_loss = 0
         for i, model in enumerate(model_list):
@@ -227,6 +241,17 @@ def train_PullSum(
         return total_loss / len(model_list)
     
     optimizer = PullSum(model_list=model_list, lr=lr, A=A, B=B, closure=closure)
+
+    def closure_for_batch(batch_h_list, batch_y_list):
+        loss_list = []
+        for i, model in enumerate(model_list):
+            model.zero_grad()
+            output = model(batch_h_list[i])
+            loss = criterion(output, batch_y_list[i])
+            loss.backward()
+            loss_list.append(loss.unsqueeze(0))
+        total_loss = torch.cat(loss_list).sum().item()
+        return total_loss / len(model_list)
 
     model_first = model_class().to(device)
     for param in model_first.parameters():
@@ -248,14 +273,41 @@ def train_PullSum(
     # 创建 tqdm 对象显示训练进度
     progress_bar = tqdm(range(epochs), desc="Training Progress")
 
-    for epoch in progress_bar:
+    """ for epoch in progress_bar:
         loss = optimizer.step(closure)  # 调用优化器的 step 方法，并传入 closure
         loss_history.append(loss)
         accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)  # 计算测试集上的准确率
         accuracy_history.append(accuracy)
 
         # 使用 set_postfix 方法来更新显示当前的 loss 和 accuracy
+        progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%") """
+
+    for epoch in progress_bar:
+        epoch_loss = 0
+        
+        if batch_size is None:
+            # 无批处理：直接使用整个数据进行训练
+            loss = optimizer.step(closure)
+            epoch_loss = loss
+        else:
+            for batch_tuple in zip(*train_loaders):
+                batch_h_list = []
+                batch_y_list = []
+                for i in range(n):
+                    batch_h, batch_y = batch_tuple[i]
+                    batch_h_list.append(batch_h)
+                    batch_y_list.append(batch_y)
+                loss = optimizer.step(lambda: closure_for_batch(batch_h_list, batch_y_list))
+                epoch_loss += loss
+            epoch_loss = epoch_loss / len(train_loaders[0])
+        
+        loss_history.append(epoch_loss)
+        accuracy = compute_accuracy(model_list, X_test_tensor, y_test_tensor)
+        accuracy_history.append(accuracy)
         progress_bar.set_postfix(epoch=epoch + 1, loss=f"{loss:.10f}", accuracy=f"{100 * accuracy:.10f}%")
+
+        yield loss_history, accuracy_history
+
     
     if show_graph:
         # 绘制损失和准确率历史图
