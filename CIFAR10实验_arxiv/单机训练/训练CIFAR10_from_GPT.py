@@ -8,19 +8,19 @@ import matplotlib.pyplot as plt
 # ===========================
 # 设置设备（使用CPU）
 # ===========================
-device = torch.device('cpu')
+device = torch.device('cuda')
 
 # ===========================
 # 超参数设置（可修改学习率、训练轮数和权重衰减）
 # ===========================
-num_epochs = 10          # 训练轮数，可根据需要修改
-learning_rate = 0.001    # 学习率，可根据需要修改
-weight_decay = 0         # 权重衰减（L2正则化），可根据需要修改
+num_epochs = 100         # 训练轮数，可根据需要修改
+learning_rate = 0.01    # 学习率，可根据需要修改
+weight_decay = 1e-4      # 权重衰减（L2正则化），可根据需要修改
 
 # ===========================
 # 数据集路径（请填入您自己的路径）
 # ===========================
-data_path = 'path_to_cifar10_dataset'  # 替换为您的CIFAR10数据集路径
+data_path = '/root/GanLuo/PullSum_MNIST/CIFAR10实验_arxiv/cifar-10-python/cifar-10-batches-py'  # 替换为您的CIFAR10数据集路径
 
 # ===========================
 # 数据预处理和加载
