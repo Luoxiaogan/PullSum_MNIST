@@ -364,13 +364,13 @@ def train_PullSum(
         # 创建一个2行2列的子图布局
         plt.subplot(1, 2, 1)
         plt.plot(train_loss_history, color="r", label="train_loss")
-        plt.plot(test_loss_history, color="r", label="test_loss")
+        plt.plot(test_loss_history, color="b", label="test_loss")
         plt.title("Loss Comparision")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
 
         plt.subplot(1, 2, 2)
-        plt.plot(test_accuracy_history, color="r")
+        plt.plot(test_accuracy_history, color="b")
         plt.title("Test Accuracy History")
         plt.xlabel("Epoch")
         plt.ylabel("Accuracy")
