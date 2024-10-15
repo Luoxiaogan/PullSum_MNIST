@@ -120,7 +120,267 @@ class PullSum_for_try(Optimizer):
 
         return loss
 
+""" # 借助GPT改进的的PullSum优化器 ——第三个版本 
+# 适用于混合精度计算    
+
 class PullSum(Optimizer):
+    def __init__(self, model_list, lr=1e-2, A=None, B=None, closure=None):
+        self.model_list = model_list
+        self.lr = lr
+        self.A = A.to(next(model_list[0].parameters()).device)
+        self.B = B.to(next(model_list[0].parameters()).device)
+
+        # 计算初始梯度
+        closure()  # closure 应该是 closure_init
+
+        # 将模型参数展平成向量
+        self.prev_params = [
+            torch.nn.utils.parameters_to_vector(model.parameters()).detach().clone()
+            for model in self.model_list
+        ]
+        self.prev_grads = [
+            torch.nn.utils.parameters_to_vector(
+                [p.grad for p in model.parameters()]
+            ).detach().clone()
+            for model in self.model_list
+        ]
+
+        # 初始化 v_list
+        self.v_list = [prev_grad.clone() for prev_grad in self.prev_grads]
+
+        self.correction_vector = torch.ones(
+            self.A.shape[0], device=next(model_list[0].parameters()).device
+        )
+
+        defaults = dict(lr=lr)
+        super(PullSum, self).__init__(model_list[0].parameters(), defaults)
+
+    def step(self):
+        with torch.no_grad():
+            # 更新修正向量
+            self.correction_vector = torch.matmul(self.A.T, self.correction_vector)
+
+            # 将 prev_params 和 v_list 堆叠成张量
+            prev_params_tensor = torch.stack(self.prev_params)
+            v_tensor = torch.stack(self.v_list)
+
+            # Step 1: x = Ax
+            new_params_tensor = torch.matmul(self.A, prev_params_tensor)
+
+            # Step 2: x = x - lr * (1 / correction) * v
+            correction_vector = self.correction_vector.unsqueeze(1)
+            scaled_v = self.lr * v_tensor / correction_vector
+            new_params_tensor -= scaled_v
+
+            # 更新模型参数
+            for i, model in enumerate(self.model_list):
+                torch.nn.utils.vector_to_parameters(new_params_tensor[i], model.parameters())
+
+            # 提取当前梯度
+            new_grads = []
+            for model in self.model_list:
+                grads = []
+                for p in model.parameters():
+                    if p.grad is not None:
+                        grads.append(p.grad.detach().clone())
+                    else:
+                        grads.append(torch.zeros_like(p))
+                new_grads.append(torch.nn.utils.parameters_to_vector(grads))
+            new_grads_tensor = torch.stack(new_grads)
+
+            # Step 4: v = Bv + g - prev_g
+            weighted_v_tensor = torch.matmul(self.B, v_tensor)
+            grad_diff_tensor = new_grads_tensor - torch.stack(self.prev_grads)
+            new_v_tensor = weighted_v_tensor + grad_diff_tensor
+
+            # 更新 v_list
+            self.v_list = [new_v_tensor[i].clone() for i in range(len(self.model_list))]
+
+            # Step 5: 更新 prev_params 和 prev_grads
+            self.prev_params = [new_params_tensor[i].clone() for i in range(len(self.model_list))]
+            self.prev_grads = [new_grads_tensor[i].clone() for i in range(len(self.model_list))] """
+
+
+    
+# 借助GPT改进的的PullSum优化器 ——第二个版本     
+
+class PullSum(Optimizer):
+    def __init__(self, model_list, lr=1e-2, A=None, B=None, closure=None):
+        self.model_list = model_list
+        self.lr = lr
+        self.A = A.to(next(model_list[0].parameters()).device)
+        self.B = B.to(next(model_list[0].parameters()).device)
+
+        # 计算初始梯度
+        closure()
+
+        # 将模型参数展平成向量
+        self.prev_params = [
+            torch.nn.utils.parameters_to_vector(model.parameters()).detach().clone()
+            for model in self.model_list
+        ]
+        self.prev_grads = [
+            torch.nn.utils.parameters_to_vector(
+                [p.grad for p in model.parameters()]
+            ).detach().clone()
+            for model in self.model_list
+        ]
+
+        # 初始化 v_list
+        self.v_list = [prev_grad.clone() for prev_grad in self.prev_grads]
+
+        self.correction_vector = torch.ones(
+            self.A.shape[0], device=next(model_list[0].parameters()).device
+        )
+
+        defaults = dict(lr=lr)
+        super(PullSum, self).__init__(model_list[0].parameters(), defaults)
+
+    def step(self, closure, lr):
+        self.lr = lr  # 可以在每一步step修改lr
+        with torch.no_grad():
+            # 更新修正向量
+            self.correction_vector = torch.matmul(self.A.T, self.correction_vector)
+
+            # 将 prev_params 和 v_list 堆叠成张量
+            prev_params_tensor = torch.stack(self.prev_params)  # 形状：(n_models, param_size)
+            v_tensor = torch.stack(self.v_list)  # 形状：(n_models, param_size)
+
+            # Step 1: x = Ax
+            new_params_tensor = torch.matmul(self.A, prev_params_tensor)  # 形状：(n_models, param_size)
+
+            # Step 2: x = x - lr * (1 / correction) * v
+            correction_vector = self.correction_vector.unsqueeze(1)  # 形状：(n_models, 1)
+            scaled_v = self.lr * v_tensor / correction_vector  # 形状：(n_models, param_size)
+            new_params_tensor -= scaled_v
+
+            # 更新模型参数
+            for i, model in enumerate(self.model_list):
+                torch.nn.utils.vector_to_parameters(new_params_tensor[i], model.parameters())
+
+        # Step 3: 计算新的梯度
+        for model in self.model_list:
+            model.zero_grad()
+        loss = closure()
+
+        with torch.no_grad():
+            # 展平新的梯度
+            new_grads = [
+                torch.nn.utils.parameters_to_vector([p.grad for p in model.parameters()]).detach().clone()
+                for model in self.model_list
+            ]
+            new_grads_tensor = torch.stack(new_grads)  # 形状：(n_models, param_size)
+
+            # Step 4: v = Bv + g - prev_g
+            weighted_v_tensor = torch.matmul(self.B, v_tensor)  # 形状：(n_models, param_size)
+            grad_diff_tensor = new_grads_tensor - torch.stack(self.prev_grads)
+            new_v_tensor = weighted_v_tensor + grad_diff_tensor
+
+            # 更新 v_list
+            self.v_list = [new_v_tensor[i].clone() for i in range(len(self.model_list))]
+
+            # Step 5: 更新 prev_params 和 prev_grads
+            self.prev_params = [new_params_tensor[i].clone() for i in range(len(self.model_list))]
+            self.prev_grads = [new_grads_tensor[i].clone() for i in range(len(self.model_list))]
+
+        return loss
+
+
+    
+# 借助GPT改进的的PullSum优化器 ——第一个版本  
+""" 
+class PullSum(Optimizer):
+    def __init__(self, model_list, lr=1e-2, A=None, B=None, closure=None):
+        self.model_list = model_list
+        self.lr = lr
+        self.A = A.to(next(model_list[0].parameters()).device)
+        self.B = B.to(next(model_list[0].parameters()).device)
+
+        # 计算初始梯度
+        closure()
+
+        # 存储上一轮的参数和梯度，避免深度拷贝整个模型
+        self.prev_params = [
+            [param.data.clone() for param in model.parameters()]
+            for model in model_list
+        ]
+        self.prev_grads = [
+            [param.grad.clone() if param.grad is not None else None for param in model.parameters()]
+            for model in model_list
+        ]
+
+        # 初始化 v_list
+        self.v_list = [
+            [param.grad.clone() if param.grad is not None else None for param in model.parameters()]
+            for model in model_list
+        ]
+
+        self.correction_vector = torch.ones(
+            self.A.shape[0], device=next(model_list[0].parameters()).device
+        )
+
+        defaults = dict(lr=lr)
+        super(PullSum, self).__init__(model_list[0].parameters(), defaults)
+
+    def step(self, closure, lr):
+        self.lr = lr#可以在每一步step修改lr
+        with torch.no_grad():
+            # 更新修正向量
+            self.correction_vector = torch.matmul(self.A.T, self.correction_vector)
+
+            # Step 1: x = Ax
+            for i, model in enumerate(self.model_list):
+                param_iter = model.parameters()
+                for idx, param in enumerate(param_iter):
+                    weighted_sum = self.A[i, 0] * self.prev_params[0][idx]
+                    for j in range(1, len(self.model_list)):
+                        weighted_sum += self.A[i, j] * self.prev_params[j][idx]
+                    param.data.copy_(weighted_sum)
+
+            # Step 2: x = x - lr * (1 / correction) * v
+            for i, model in enumerate(self.model_list):
+                correction = self.correction_vector[i]
+                for idx, param in enumerate(model.parameters()):
+                    v = self.v_list[i][idx]
+                    if v is not None:
+                        param.data -= self.lr * (v / correction)
+
+        # Step 3: 计算新的梯度
+        for model in self.model_list:
+            model.zero_grad()
+        loss = closure()
+
+        with torch.no_grad():
+            # Step 4: v = Bv + g - prev_g
+            new_v_list = []
+            for i, model in enumerate(self.model_list):
+                new_v = []
+                for idx, param in enumerate(model.parameters()):
+                    if param.grad is not None:
+                        weighted_v = self.B[i, 0] * self.v_list[0][idx]
+                        for j in range(1, len(self.model_list)):
+                            weighted_v += self.B[i, j] * self.v_list[j][idx]
+                        v_update = weighted_v + param.grad - self.prev_grads[i][idx]
+                        new_v.append(v_update)
+                    else:
+                        new_v.append(None)
+                new_v_list.append(new_v)
+            self.v_list = new_v_list
+
+            # Step 5: 更新 prev_params 和 prev_grads
+            self.prev_params = [
+                [param.data.clone() for param in model.parameters()]
+                for model in self.model_list
+            ]
+            self.prev_grads = [
+                [param.grad.clone() if param.grad is not None else None for param in model.parameters()]
+                for model in self.model_list
+            ]
+
+        return loss """
+
+
+""" class PullSum(Optimizer):
     def __init__(self, model_list, lr=1e-2, A=None, B=None, closure=None):
         self.model_list = model_list
         self.lr = lr
@@ -225,7 +485,7 @@ class PullSum(Optimizer):
             
             self.prev_v_list = [[v.clone() if v is not None else None for v in self.v_list[i]] for i in range(len(self.model_list))]
 
-        return loss
+        return loss """
 
 class PullDiag(Optimizer):
     def __init__(self, model_list, lr=1e-2, A=None, closure=None):

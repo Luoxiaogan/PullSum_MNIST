@@ -3,12 +3,31 @@ import torch.utils.data
 import torchvision
 import torchvision.transforms as transforms
 import math
+import numpy as np
+import random
+
 
 def distributed_cifar10_dataloaders(
     n,
     batch_size=128,
     root="/root/GanLuo/PullSum_MNIST/CIFAR10实验_arxiv/cifar-10-python/cifar-10-batches-py",
+    seed=42,
 ):
+
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
+    # 创建用于控制DataLoader随机性的生成器
+    def worker_init_fn(worker_id):
+        worker_seed = seed + worker_id
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+        torch.manual_seed(worker_seed)
+
     # 数据增强和预处理
     transform_train = transforms.Compose(
         [
@@ -66,7 +85,15 @@ def distributed_cifar10_dataloaders(
 
         # 为每个节点创建DataLoader
         trainloader = torch.utils.data.DataLoader(
-            subset, batch_size=batch_size, shuffle=True, num_workers=2
+            subset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=12,
+            pin_memory=True,
+            prefetch_factor=2,
+            persistent_workers=True,
+            worker_init_fn=worker_init_fn,
+            generator=generator,
         )
         trainloader_list.append(trainloader)
 
@@ -75,7 +102,15 @@ def distributed_cifar10_dataloaders(
 
     # 创建测试集 DataLoader (无需改变)
     testloader = torch.utils.data.DataLoader(
-        testset, batch_size=100, shuffle=False, num_workers=2
+        testset,
+        batch_size=100,
+        shuffle=False,
+        num_workers=12,
+        pin_memory=True,
+        prefetch_factor=2,
+        persistent_workers=True,
+        worker_init_fn=worker_init_fn,
+        generator=generator,
     )
 
     return trainloader_list, testloader
