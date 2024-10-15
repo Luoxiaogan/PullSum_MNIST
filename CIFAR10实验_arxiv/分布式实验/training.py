@@ -92,6 +92,7 @@ def compute_accuracy(model_class, model_list, testloader, use_amp=False):
 
     return average_loss, accuracy
 
+
 """ 
 # GPT优化的版本, 可以选择混合精度计算
 
@@ -278,8 +279,12 @@ def train_PullSum(
     criterion = nn.CrossEntropyLoss().to(device)
 
     h_data_train, y_data_train = get_first_batch(trainloader_list)
-    h_data_train = [tensor.to(device, non_blocking=True) for tensor in h_data_train]#[tensor.to(device) for tensor in h_data_train]
-    y_data_train = [tensor.to(device, non_blocking=True) for tensor in y_data_train]#[tensor.to(device) for tensor in y_data_train]
+    h_data_train = [
+        tensor.to(device, non_blocking=True) for tensor in h_data_train
+    ]  # [tensor.to(device) for tensor in h_data_train]
+    y_data_train = [
+        tensor.to(device, non_blocking=True) for tensor in y_data_train
+    ]  # [tensor.to(device) for tensor in y_data_train]
 
     def closure():
         total_loss = 0
@@ -314,12 +319,16 @@ def train_PullSum(
 
         train_loss = 0
 
-        #for batch_idx, batch in enumerate(zip(*[iter(loader) for loader in trainloader_list])): 直接遍历trainloader_list中的加载器，无需再使用iter和zip, 因为数据加载器中使用pin_memory=True
+        # for batch_idx, batch in enumerate(zip(*[iter(loader) for loader in trainloader_list])): 直接遍历trainloader_list中的加载器，无需再使用iter和zip, 因为数据加载器中使用pin_memory=True
         for batch_idx, batch in enumerate(zip(*trainloader_list)):
-            inputs = [data[0].to(device, non_blocking=True) for data in batch]#[data[0] for data in batch]
-            labels = [data[1].to(device, non_blocking=True) for data in batch]#[data[1] for data in batch]
-            h_data_train = inputs#[tensor.to(device) for tensor in inputs]
-            y_data_train = labels#[tensor.to(device) for tensor in labels]
+            inputs = [
+                data[0].to(device, non_blocking=True) for data in batch
+            ]  # [data[0] for data in batch]
+            labels = [
+                data[1].to(device, non_blocking=True) for data in batch
+            ]  # [data[1] for data in batch]
+            h_data_train = inputs  # [tensor.to(device) for tensor in inputs]
+            y_data_train = labels  # [tensor.to(device) for tensor in labels]
             loss = optimizer.step(closure=closure, lr=lr)
             train_loss += loss
         train_loss = train_loss / len(trainloader_list[0])
