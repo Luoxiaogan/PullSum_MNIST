@@ -2,3 +2,4 @@ Ring4, 均匀数据
 pullsum opt_lr = 9e-4
 pulldiag opt_lr = 9e-4
 frsd opt_lr = 9e-4, opr_beta = 0.1
+frozen opt_lr = 9e-4, opr_beta = 0.1
