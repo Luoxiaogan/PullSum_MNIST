@@ -107,6 +107,7 @@ def train_PullSum(
     batch_size=128,
     csv_root=None,
     warm_up=False,
+    k=5,
 ):
 
     torch.backends.cudnn.benchmark = True
@@ -190,17 +191,30 @@ def train_PullSum(
         )
 
         # 将结果保存为 DataFrame，并存储为 CSV 文件
-        if csv_root is not None:
-            df = pd.DataFrame(
-                {
-                    "Epoch": list(range(1, epoch + 2)),
-                    "Train_Loss": train_loss_history,
-                    "Test_Loss": test_loss_history,
-                    "Test_Accuracy": test_accuracy_history,
-                }
-            )
-            csv_path = csv_root
-            df.to_csv(csv_path, index=False)
+        if epoch%k==0:
+            if csv_root is not None:
+                df = pd.DataFrame(
+                    {
+                        "Epoch": list(range(1, epoch + 2)),
+                        "Train_Loss": train_loss_history,
+                        "Test_Loss": test_loss_history,
+                        "Test_Accuracy": test_accuracy_history,
+                    }
+                )
+                csv_path = csv_root
+                df.to_csv(csv_path, index=False)
+
+    if csv_root is not None:
+        df = pd.DataFrame(
+            {
+                "Epoch": list(range(1, epoch + 2)),
+                "Train_Loss": train_loss_history,
+                "Test_Loss": test_loss_history,
+                "Test_Accuracy": test_accuracy_history,
+            }
+        )
+        csv_path = csv_root
+        df.to_csv(csv_path, index=False)
 
     if show_graph:
         # 创建一个2行2列的子图布局
