@@ -115,13 +115,15 @@ def distributed_cifar10_dataloaders(
 
     return trainloader_list, testloader
 
-""" 根据这个函数, 写一个新的函数, 一般来说, 此时默认n=20
+""" 根据这个函数, 写一个新的函数, 一般来说, 此时默认n=10
 
-我有两组分布的数据, 一组数据上, 按照上面的函数, 正常的, 完全打乱了训练数据的均匀分布, 分布在20个节点上
+我有两组分布的数据, 一组数据上, 按照上面的函数, 正常的, 完全打乱了训练数据的均匀分布, 分布在10个节点上
 
-还有一组数据是, CIFAR10有十类, 那么20个节点(0到19), 节点0和10保存第一类的数据, 节点1和11保存第二类的数据, 节点2和12保存第三类的数据, ..., 节点9和19保存第十类的数据
+还有一组数据是, CIFAR10有十类, 那么10个节点(0到9), 节点0保存第一类的数据, 节点1保存第二类的数据, 节点2保存第三类的数据, ..., 节点9保存第十类的数据
 
-然后, 我根据函数的输入参数alpha, 作为第二组(大异质性数据)的比例, 即, 以概率p在第二组数据(每一个节点)随机抽样, 以概率1-p在第一组数据(每一个节点), 然后合并成新的数据, 然后把它做成trainloader """
+然后, 我根据函数的输入参数alpha, 作为第二组(大异质性数据)的比例, 即, 以概率p在第二组数据(每一个节点)随机抽样, 以概率1-p在第一组数据(每一个节点)随机抽样, 然后合并成新的数据, 然后把它做成trainloader 
+
+但是, 这样得到的训练集会损失一部分的图片, 除了上述的方法, 你还有什么方法来生成高异质性(可以通过alpha控制)的数据分布，同时能保证每一个图片都被使用到吗？"""
 
 import torch
 import torch.utils.data
@@ -129,7 +131,6 @@ import torchvision
 import torchvision.transforms as transforms
 import numpy as np
 import random
-
 
 def hetero_distributed_cifar10_dataloaders(
     n=20,
@@ -269,6 +270,153 @@ def hetero_distributed_cifar10_dataloaders(
         trainloader_list.append(trainloader)
 
     # Create test DataLoader (unchanged)
+    testloader = torch.utils.data.DataLoader(
+        testset,
+        batch_size=100,
+        shuffle=False,
+        num_workers=15,
+        pin_memory=True,
+        prefetch_factor=2,
+        persistent_workers=True,
+        worker_init_fn=worker_init_fn,
+        generator=generator,
+    )
+
+    return trainloader_list, testloader
+
+import torch
+import torchvision
+import torchvision.transforms as transforms
+import numpy as np
+import random
+from collections import defaultdict
+
+def mixed_distributed_cifar10_dataloaders_alpha(
+    n=10,
+    batch_size=128,
+    alpha=0.5,
+    root="/root/GanLuo/PullSum_MNIST/CIFAR10实验_arxiv/cifar-10-python/cifar-10-batches-py",
+    seed=42,
+):
+    """
+    根据alpha参数创建高度异质性的数据分布，同时确保所有图片被使用。
+
+    参数:
+        n (int): 节点数量，默认10。
+        batch_size (int): 每个DataLoader的batch大小，默认128。
+        alpha (float): 控制每个类别分配给对应节点的比例，0 <= alpha <= 1。
+        root (str): CIFAR-10数据集的根目录。
+        seed (int): 随机种子，默认42。
+
+    返回:
+        trainloader_list (list): 每个节点对应的训练DataLoader列表。
+        testloader (DataLoader): 测试集的DataLoader。
+    """
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
+    # Worker初始化函数，确保每个worker的随机性可复现
+    def worker_init_fn(worker_id):
+        worker_seed = seed + worker_id
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+        torch.manual_seed(worker_seed)
+
+    # 数据增强和预处理
+    transform_train = transforms.Compose(
+        [
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(15),
+            transforms.ColorJitter(
+                brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+            ),
+            transforms.RandomGrayscale(p=0.1),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+            ),
+        ]
+    )
+
+    transform_test = transforms.Compose(
+        [
+            transforms.ToTensor(),
+            transforms.Normalize(
+                (0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)
+            ),
+        ]
+    )
+
+    # 加载CIFAR-10训练和测试集
+    trainset = torchvision.datasets.CIFAR10(
+        root=root, train=True, download=False, transform=transform_train
+    )
+    testset = torchvision.datasets.CIFAR10(
+        root=root, train=False, download=False, transform=transform_test
+    )
+
+    # 按类别整理索引
+    class_indices = defaultdict(list)
+    for idx, (_, label) in enumerate(trainset):
+        class_indices[label].append(idx)
+
+    # 初始化每个节点的索引列表
+    node_indices = [[] for _ in range(n)]
+
+    # 对于每个类别，按照alpha分配
+    for cls in range(n):
+        indices = class_indices[cls]
+        total_cls = len(indices)
+        n_alpha = int(total_cls * alpha)
+        n_remaining = total_cls - n_alpha
+
+        # 随机打乱该类别的索引
+        random.shuffle(indices)
+
+        # 分配alpha比例的数据给对应节点
+        alpha_indices = indices[:n_alpha]
+        node_indices[cls].extend(alpha_indices)
+
+        # 剩余的1 - alpha的数据均匀分配给所有节点
+        remaining_indices = indices[n_alpha:]
+        # 计算每个节点应分配的数量
+        per_node = len(remaining_indices) // n
+        remainder = len(remaining_indices) % n
+
+        start = 0
+        for node in range(n):
+            extra = 1 if node < remainder else 0
+            end = start + per_node + extra
+            node_indices[node].extend(remaining_indices[start:end])
+            start = end
+
+    # 打乱每个节点的索引，混合非特定类的数据
+    for node in range(n):
+        random.shuffle(node_indices[node])
+
+    # 创建DataLoaders
+    trainloader_list = []
+    for node in range(n):
+        subset = torch.utils.data.Subset(trainset, node_indices[node])
+        trainloader = torch.utils.data.DataLoader(
+            subset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=15,
+            pin_memory=True,
+            prefetch_factor=2,
+            persistent_workers=True,
+            worker_init_fn=worker_init_fn,
+            generator=generator,
+        )
+        trainloader_list.append(trainloader)
+
+    # 创建测试集 DataLoader
     testloader = torch.utils.data.DataLoader(
         testset,
         batch_size=100,
